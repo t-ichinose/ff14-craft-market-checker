@@ -1,0 +1,101 @@
+name: FF14 Market Data Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Execution mode (Item count)'
+        required: true
+        default: 'All'
+        type: choice
+        options:
+          - 'All'
+          - '200'
+          - '50'
+      concurrency:
+        description: 'Concurrency (Parallel requests)'
+        required: true
+        default: '6'
+        type: choice
+        options:
+          - '6'
+          - '8'
+          - '4'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: market-update
+  cancel-in-progress: false
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install httpx sqlalchemy requests
+
+      - name: Restore / Cache SQLite Database
+        uses: actions/cache@v4
+        with:
+          path: data/ff14_craft.db
+          key: ff14-craft-db-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            ff14-craft-db-${{ runner.os }}-
+
+      - name: Run Unified Market Pipeline
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: |
+          TEST_MODE="${{ inputs.test_mode || 'All' }}"
+          CONCURRENCY="${{ inputs.concurrency || '6' }}"
+          echo "=== Starting Pipeline (Items: $TEST_MODE, Concurrency: $CONCURRENCY) ==="
+          
+          if [ "$TEST_MODE" = "All" ]; then
+            python backend/app/pipeline/unified_pipeline.py --concurrency $CONCURRENCY
+          else
+            python backend/app/pipeline/unified_pipeline.py --sample $TEST_MODE --concurrency $CONCURRENCY
+          fi
+          echo "=== Pipeline Completed ==="
+
+      - name: Check Generated Data Size
+        run: |
+          ls -lh frontend/public/data.json.gz || true
+
+      - name: Commit and push updated data (Single-commit Overwrite mode)
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f frontend/public/data.json.gz data/data.json.gz frontend/public/recipes.json frontend/public/recipes.json.gz data/recipes.json data/recipes.json.gz data/items_metadata.json.gz data/marketable_item_ids.txt || true
+
+          LAST_AUTHOR=$(git log -1 --pretty=format:'%an')
+          COMMIT_MSG="Auto-update market data (${{ inputs.test_mode || 'Scheduled 30min' }})"
+
+          if [ "$LAST_AUTHOR" = "github-actions[bot]" ]; then
+            echo "⚡ Previous commit was from bot. Overwriting (amend) to prevent repository bloat..."
+            git commit --amend -m "$COMMIT_MSG"
+            git push --force origin main
+            echo "✨ Successfully overwritten previous bot commit with latest data."
+          else
+            echo "📦 Previous commit was from user. Creating a new data commit..."
+            if git diff --staged --quiet; then
+              echo "No data changes to commit."
+            else
+              git commit -m "$COMMIT_MSG"
+              git push origin main
+              echo "✨ Successfully pushed new data commit."
+            fi
+          fi
