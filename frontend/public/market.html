@@ -1,0 +1,3736 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+
+  <title>FF14 Market Analytics - Japan Datacenters & World Tracker</title>
+  <!-- Google Fonts & Icons & Chart.js -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --card-bg: rgba(22, 30, 49, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-blue: #00d2ff;
+      --accent-purple: #7928ca;
+      --accent-gold: #ffb703;
+      --accent-green: #4ade80;
+      --accent-red: #f87171;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      max-height: 100%;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(121, 40, 202, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.12) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+    }
+
+    .history-table-container {
+      max-height: 320px;
+      overflow-y: auto;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    @media (min-width: 769px) {
+      #itemDetailModal {
+        display: none !important;
+      }
+      .pc-dashboard-container {
+        display: flex !important;
+        gap: 1.25rem !important;
+        align-items: stretch !important;
+        margin-top: 0.35rem;
+        width: 100%;
+        flex: 1;
+        min-height: 0;
+        height: calc(100% - 55px);
+      }
+      .left-card-scroll-pane {
+        width: 440px !important;
+        flex: 0 0 440px !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        padding: 0.85rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(12px);
+      }
+      .pc-dashboard-container.view-analytics #arbitrageGridWrapper,
+      .pc-dashboard-container.view-analytics #arbitrageMonitorWrapper {
+        display: none !important;
+      }
+      .pc-dashboard-container.view-analytics #analyticsGridWrapper,
+      .pc-dashboard-container.view-analytics #analyticsMonitorWrapper {
+        display: flex !important;
+      }
+      .pc-dashboard-container.view-arbitrage #analyticsGridWrapper,
+      .pc-dashboard-container.view-arbitrage #analyticsMonitorWrapper {
+        display: none !important;
+      }
+      .pc-dashboard-container.view-arbitrage #arbitrageGridWrapper,
+      .pc-dashboard-container.view-arbitrage #arbitrageMonitorWrapper {
+        display: flex !important;
+      }
+      .left-card-scroll-pane .grid-scroll-wrapper,
+      .left-card-scroll-pane .world-grid-scroll-container,
+      .left-card-scroll-pane .world-column {
+        flex: 1 !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        width: 100% !important;
+      }
+      .left-pane-header {
+        flex-shrink: 0 !important;
+        background: rgba(15, 23, 42, 0.95) !important;
+        border: 1px solid var(--card-border) !important;
+        border-radius: 12px !important;
+        padding: 0.6rem 0.75rem !important;
+        margin-bottom: 0.65rem !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+      }
+      .world-item-list {
+        flex: 1 !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        padding-right: 4px;
+        padding-bottom: 0.5rem !important;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      .world-item-list::-webkit-scrollbar {
+        width: 6px;
+      }
+      .world-item-list::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+      }
+      .pc-right-pane {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 !important;
+        min-width: 0 !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden !important;
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        padding: 1.1rem 1.25rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(12px);
+      }
+      .pc-right-pane .history-table-container {
+        max-height: none !important;
+        flex: 1 !important;
+        height: 100% !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+      }
+      .pc-right-pane::-webkit-scrollbar {
+        width: 6px;
+      }
+      .pc-right-pane::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+      }
+      .slider-nav-btn, .grid-slide-btn {
+        display: none !important;
+      }
+      .pc-world-select {
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid var(--accent-blue);
+        border-radius: 8px;
+        color: #ffffff;
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 3px 6px;
+        outline: none;
+        cursor: pointer;
+        box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
+        transition: all 0.2s ease;
+      }
+      .pc-world-select:hover {
+        border-color: #38bdf8;
+        box-shadow: 0 0 14px rgba(0, 210, 255, 0.4);
+      }
+      .pc-world-select optgroup {
+        background: #0f172a;
+        color: var(--accent-gold);
+        font-weight: 700;
+      }
+      .pc-world-select option {
+        background: #0f172a;
+        color: #ffffff;
+        font-weight: 600;
+      }
+      .dc-summary-card.clickable-card {
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .dc-summary-card.clickable-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 210, 255, 0.25);
+        border-color: var(--accent-blue) !important;
+      }
+      .item-card.active-card {
+        border-color: var(--accent-blue) !important;
+        background: linear-gradient(135deg, rgba(0, 210, 255, 0.12) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+        box-shadow: 0 0 16px rgba(0, 210, 255, 0.45) !important;
+      }
+    }
+
+    .container {
+      max-width: 1850px;
+      margin: 0 auto;
+      height: 100%;
+      padding: 0.5rem 0.8rem;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+
+    body.is-embedded .container {
+      padding: 0.25rem 0.6rem !important;
+    }
+
+    body.is-embedded header {
+      display: none !important;
+    }
+
+    body.is-embedded .pc-dashboard-container {
+      height: 100% !important;
+      margin-top: 0 !important;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      gap: 0.8rem;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .brand-icon {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      color: white;
+      box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
+    }
+
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      background: linear-gradient(to right, #ffffff, #94a3b8);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* View Mode Switcher Buttons */
+    .view-mode-tab-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 0.35rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .view-mode-tab-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .view-mode-tab-btn.active {
+      background: linear-gradient(135deg, rgba(0, 210, 255, 0.2), rgba(255, 183, 3, 0.2));
+      border-color: rgba(255, 183, 3, 0.4);
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(255, 183, 3, 0.2);
+    }
+
+    /* Arbitrage Grid & Card Styles */
+    .arbitrage-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 1rem;
+      width: 100%;
+    }
+
+    .arbitrage-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 0.85rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      transition: all 0.25s ease;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .arbitrage-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255, 183, 3, 0.5);
+      box-shadow: 0 8px 24px rgba(255, 183, 3, 0.15);
+    }
+
+    .arbitrage-card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+
+
+    .arb-route-grid {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+    }
+
+    .arb-route-box {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .arb-route-box.buy-box {
+      border-left: 3px solid var(--accent-green);
+      padding-left: 0.5rem;
+    }
+
+    .arb-route-box.sell-box {
+      border-left: 3px solid var(--accent-blue);
+      padding-left: 0.5rem;
+    }
+
+    .arb-box-lbl {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .arb-box-world {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .arb-box-price {
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--text-main);
+      white-space: nowrap;
+    }
+
+    .arb-route-arrow {
+      color: var(--accent-gold);
+      font-size: 1.1rem;
+      opacity: 0.7;
+      flex-shrink: 0;
+    }
+
+    .arb-profit-summary {
+      display: grid;
+      grid-template-columns: 1fr 0.9fr 1.25fr;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(255, 183, 3, 0.06);
+      border: 1px solid rgba(255, 183, 3, 0.2);
+      border-radius: 8px;
+      padding: 0.45rem 0.6rem;
+      font-size: 0.72rem;
+    }
+
+    .arb-stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      overflow: hidden;
+    }
+
+    .arb-stat-item.gold-highlight {
+      background: rgba(255, 183, 3, 0.12);
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 183, 3, 0.3);
+    }
+
+
+
+
+    /* Single-Row Unified Controls Bar: World Nav Tabs + Search Box + Sort Controls */
+
+
+
+
+
+
+    .search-input {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 0.38rem 0.8rem 0.38rem 2.4rem;
+      color: var(--text-main);
+      font-size: 0.82rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+      box-sizing: border-box;
+      margin: 0;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent-blue);
+    }
+
+
+
+    .sort-toggle-group {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 2px;
+      box-sizing: border-box;
+      margin: 0;
+    }
+
+    .sort-toggle-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      padding: 0 0.7rem;
+      height: 26px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sort-toggle-btn:hover {
+      color: #ffffff;
+    }
+
+    .sort-toggle-btn.active {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      color: #ffffff;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(0, 210, 255, 0.25);
+    }
+
+    /* View Toggle Group (Arbitrage Monitor Sub-tabs) */
+    .view-toggle-group {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 2px;
+      box-sizing: border-box;
+    }
+
+    .view-toggle-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      padding: 3px 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .view-toggle-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .view-toggle-btn.active {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      color: #ffffff;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(0, 210, 255, 0.25);
+    }
+
+    .filter-toggle-btn {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+      border: 1px solid var(--card-border);
+      padding: 0.35rem 0.85rem;
+      border-radius: 16px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+    }
+
+    .filter-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+
+    .filter-toggle-btn.active {
+      background: linear-gradient(135deg, rgba(121, 40, 202, 0.3), rgba(0, 210, 255, 0.25));
+      border-color: rgba(0, 210, 255, 0.5);
+      color: #00d2ff;
+      box-shadow: 0 2px 8px rgba(0, 210, 255, 0.2);
+    }
+
+    /* World Grid (4 Columns Visible, Lightweight Carousel) */
+    .world-grid {
+      display: flex;
+      gap: 1rem;
+      overflow-x: auto;
+      height: 100%;
+      min-height: 0;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+      scroll-behavior: smooth;
+      align-items: stretch;
+    }
+
+    .world-grid::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+
+    .world-column {
+      flex: 0 0 calc((100% - 3rem) / 4);
+      min-width: calc((100% - 3rem) / 4);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+      box-sizing: border-box;
+    }
+
+
+
+    /* Grid Slide Container & Navigation Buttons */
+    .grid-scroll-wrapper {
+      position: relative;
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+
+
+
+
+    .world-item-list {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 0.75rem 0.75rem 1.2rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .world-item-list::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .world-item-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+
+    /* Enhanced Original Item Card Style */
+    .item-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 0.7rem 0.75rem;
+      transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      cursor: pointer;
+    }
+
+    .item-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 210, 255, 0.35);
+      background: rgba(15, 23, 42, 0.9);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .item-card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.7rem;
+    }
+
+    .item-icon {
+      background: rgba(255, 255, 255, 0.05);
+      aspect-ratio: 1 / 1;
+      object-fit: contain;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      flex-shrink: 0;
+    }
+
+    .item-header-text {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .item-card-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .lodestone-link-icon {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      transition: color 0.2s ease;
+    }
+
+    .lodestone-link-icon:hover {
+      color: var(--accent-blue);
+    }
+
+    .rank-tag {
+      color: var(--accent-gold);
+      font-weight: 700;
+      margin-right: 0.35rem;
+    }
+
+
+
+    /* DC内ハイライト比較カード (4カラム: 最安値・最安平均・最高平均・最高値) */
+    .dc-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.6rem;
+    }
+
+
+
+    .dc-summary-card {
+      background: rgba(11, 17, 30, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 0.75rem 0.85rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 0.4rem;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .dc-summary-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+      filter: brightness(1.15);
+    }
+
+    .modal-card.arb-modal-wide {
+      max-width: 1320px;
+    }
+
+    .arb-modal-dual-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+
+
+
+    .arb-world-column-card {
+      background: rgba(11, 17, 30, 0.7);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+
+    .arb-world-column-card.buy-side {
+      border-top: 4px solid var(--accent-green);
+    }
+
+    .arb-world-column-card.sell-side {
+      border-top: 4px solid var(--accent-blue);
+    }
+
+    .copy-icon-btn {
+      background: rgba(255, 183, 3, 0.12);
+      border: 1px solid rgba(255, 183, 3, 0.35);
+      color: #ffb703;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+    }
+
+    .copy-icon-btn:hover {
+      background: #ffb703;
+      color: #000000;
+      box-shadow: 0 0 10px rgba(255, 183, 3, 0.5);
+      transform: scale(1.05);
+    }
+
+    .copy-icon-btn.copied {
+      background: rgba(74, 222, 128, 0.2);
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    .dc-summary-card.min-card {
+      border-left: 4px solid var(--accent-green);
+      background: linear-gradient(135deg, rgba(74, 222, 128, 0.08), rgba(11, 17, 30, 0.6));
+    }
+
+    .dc-summary-card.min-avg-card {
+      border-left: 4px solid #c084fc;
+      background: linear-gradient(135deg, rgba(192, 132, 252, 0.08), rgba(11, 17, 30, 0.6));
+    }
+
+    .dc-summary-card.max-avg-card {
+      border-left: 4px solid #f472b6;
+      background: linear-gradient(135deg, rgba(244, 114, 182, 0.08), rgba(11, 17, 30, 0.6));
+    }
+
+    .dc-summary-card.max-card {
+      border-left: 4px solid #ef4444;
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(11, 17, 30, 0.6));
+    }
+
+    .dc-summary-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      white-space: nowrap;
+    }
+
+    .dc-summary-world {
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .dc-summary-price {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 1.05rem;
+      white-space: nowrap;
+    }
+
+    .min-card .dc-summary-price { color: var(--accent-green); }
+    .min-avg-card .dc-summary-price { color: #c084fc; }
+    .max-avg-card .dc-summary-price { color: #f472b6; }
+    .max-card .dc-summary-price { color: #ef4444; }
+
+
+
+    /* History Table */
+    .history-table-container {
+      background: rgba(11, 17, 30, 0.7);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      overflow-y: auto;
+      max-height: 380px;
+      min-height: 200px;
+    }
+
+    .history-table-container::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .history-table-container::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+
+    .history-table-container::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-blue);
+    }
+
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      text-align: left;
+    }
+
+    .history-table th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #0f172a !important;
+      backdrop-filter: none !important;
+      padding: 0.65rem 1rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.75rem;
+      border-bottom: 2px solid var(--card-border);
+    }
+
+    .history-table td {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+    }
+
+    .history-table tr:hover td {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .hq-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #00d2ff, #3b82f6);
+      color: #000000;
+      font-weight: 800;
+      font-size: 0.68rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      margin-left: 0.3rem;
+    }
+
+    .item-icon-clickable {
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .item-icon-clickable:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 12px rgba(0, 210, 255, 0.6);
+    }
+
+    .item-card-title-clickable {
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+
+    .item-card-title-clickable:hover {
+      color: var(--accent-blue);
+    }
+
+
+  </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js" defer></script>
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      <div class="brand">
+        <div class="brand-icon"><i class="fa-solid fa-chart-simple"></i></div>
+        <div>
+          <h1 style="font-size: 1.35rem; line-height: 1.1;">FF14 Market Tracker</h1>
+          <div style="font-size:0.7rem; color:var(--text-muted);">Japan Datacenters & All 32 Worlds Comparison</div>
+        </div>
+      </div>
+
+      <div class="header-badges" style="display: flex; align-items: center; gap: 0.6rem;">
+        <!-- Fixed Mode Switcher Tabs right to the left of 集計期間 / 最終更新 -->
+        <div class="view-mode-tabs" style="display: flex; gap: 0.3rem; background: rgba(0, 0, 0, 0.35); padding: 3px; border-radius: 10px; border: 1px solid var(--card-border);">
+          <button class="view-mode-tab-btn active" id="modeBtnAnalytics" onclick="switchMainViewMode('analytics')">
+            <i class="fa-solid fa-chart-line" style="color: var(--accent-blue);"></i> 市場分析
+          </button>
+          <button class="view-mode-tab-btn" id="modeBtnArbitrage" onclick="switchMainViewMode('arbitrage')">
+            <i class="fa-solid fa-coins" style="color: var(--accent-gold);"></i> 金策ナビ
+          </button>
+        </div>
+
+        <div class="status-badge" id="lastUpdatedBadge" style="padding:0.25rem 0.6rem; font-size:0.75rem;">
+          <span class="status-dot"></span> 最終更新: 読み込み中...
+        </div>
+      </div>
+    </header>
+
+
+    
+    <!-- 2-Column Split Dashboard Container -->
+    <div class="pc-dashboard-container view-analytics" id="pcDashboardContainer">
+      <!-- 👈 左半分: 1列品目カードリスト (幅 440px・独立縦スクロール対応) -->
+      <div class="left-card-scroll-pane" style="height: 100% !important; max-height: 100% !important; flex: 0 0 440px !important; display: flex !important; flex-direction: column !important; min-height: 0 !important;">
+        <!-- 市場分析用グリッドラッパー -->
+        <div class="grid-scroll-wrapper" id="analyticsGridWrapper" style="width: 100%; flex: 1; height: 100%; min-height: 0; display: flex; flex-direction: column;">
+          <div class="world-grid-scroll-container" id="worldGrid" style="display: flex; flex-direction: column; width: 100%; flex: 1; height: 100%; min-height: 0;">
+            <div style="text-align:center; padding:3rem; width:100%; color:var(--text-muted);">
+              <i class="fa-solid fa-spinner fa-spin fa-2x"></i><br><br>マーケットデータを読み込み中...
+            </div>
+          </div>
+        </div>
+
+        <!-- 金策ナビ用グリッドラッパー -->
+        <div class="grid-scroll-wrapper" id="arbitrageGridWrapper" style="width: 100%; flex: 1; height: 100%; min-height: 0; display: none; flex-direction: column;">
+          <div class="world-column" id="arbitrageWorldColumn" style="flex: 1; height: 100%; min-height: 0; display: flex; flex-direction: column;">
+            <!-- JS Populated PC Header -->
+            <div class="world-item-list" id="arbitrageCardGrid" style="flex: 1; height: 100%; min-height: 0; overflow-y: auto;">
+              <div style="text-align:center; padding:3rem; width:100%; color:var(--text-muted);">
+                <i class="fa-solid fa-spinner fa-spin fa-2x"></i><br><br>金策データを集計中...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 👉 右半分: 常設 詳細モニターエリア (動的出力パネル 1fr) -->
+      <div class="pc-right-pane" id="pcRightMonitorPane">
+        <!-- 1. 市場分析用モニターラッパー -->
+        <div class="monitor-wrapper" id="analyticsMonitorWrapper" style="display: flex; flex-direction: column; height: 100%; width: 100%; min-height: 0; overflow: hidden;">
+          <div style="text-align:center; padding:3.5rem; color:var(--text-muted); display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%;">
+            <div style="width:84px; height:84px; border-radius:50%; background:rgba(0, 210, 255, 0.08); border:1px solid rgba(0, 210, 255, 0.25); display:flex; align-items:center; justify-content:center; margin-bottom:1.25rem; box-shadow:0 0 35px rgba(0, 210, 255, 0.15);">
+              <i class="fa-solid fa-chart-line" style="font-size:2.5rem; color:var(--accent-blue);"></i>
+            </div>
+            <div style="font-size:1.25rem; font-weight:800; color:#ffffff; margin-bottom:0.5rem;">品目を選択してください</div>
+            <div style="font-size:0.85rem; color:#94a3b8; max-width:380px; line-height:1.6;">左側のカード一覧からアイテムを選択すると全32ワールドの価格比較と推移が表示されます</div>
+          </div>
+        </div>
+
+        <!-- 2. 金策ナビ用2窓モニターラッパー -->
+        <div class="monitor-wrapper" id="arbitrageMonitorWrapper" style="display: none; flex-direction: column; height: 100%; width: 100%; min-height: 0; overflow: hidden;">
+          <div style="text-align:center; padding:3.5rem; color:var(--text-muted); display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%;">
+            <div style="width:84px; height:84px; border-radius:50%; background:rgba(251, 191, 36, 0.08); border:1px solid rgba(251, 191, 36, 0.25); display:flex; align-items:center; justify-content:center; margin-bottom:1.25rem; box-shadow:0 0 35px rgba(251, 191, 36, 0.15);">
+              <i class="fa-solid fa-scale-balanced" style="font-size:2.5rem; color:var(--accent-gold);"></i>
+            </div>
+            <div style="font-size:1.25rem; font-weight:800; color:#ffffff; margin-bottom:0.5rem;">金策品目を選択してください</div>
+            <div style="font-size:0.85rem; color:#94a3b8; max-width:380px; line-height:1.6;">左側の金策カードをクリックすると仕入れ先と販売先の2窓比較が表示されます</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+  </div>
+
+
+
+  <script>
+    async function fetchWithTimeout(resource, options = {}) {
+      const { timeout = 8000 } = options;
+      const controller = new AbortController();
+      const id = setTimeout(() => clearTimeout(id), timeout);
+      try {
+        const response = await fetch(resource, { ...options, signal: controller.signal });
+        clearTimeout(id);
+        return response;
+      } catch (error) {
+        clearTimeout(id);
+        throw error;
+      }
+    }
+
+    // Check if running inside iframe
+    if (window.self !== window.top || window.location.search.includes('embedded=true')) {
+      document.body.classList.add('is-embedded');
+    }
+
+    // Message listener from parent (React App)
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'SET_VIEW_MODE') {
+        switchMainViewMode(event.data.mode);
+      }
+      if (event.data && event.data.type === 'SET_SHARED_WORLD') {
+        applySharedWorldFromParent(event.data.world);
+      }
+    });
+
+    let allData = {};
+    let activeDc = "Mana";
+    let activeSortMode = "velocity";
+    let excludeCrystals = true; // デフォルトでクリスタル類を除外
+    let dcWorldsMap = {
+      "Elemental": ["Carbuncle", "Gungnir", "Kujata", "Typhon", "Atomos", "Tonberry", "Aegis", "Garuda"],
+      "Gaia": ["Alexander", "Bahamut", "Durandal", "Fenrir", "Ifrit", "Ridill", "Tiamat", "Ultima"],
+      "Mana": ["Anima", "Asura", "Chocobo", "Hades", "Ixion", "Masamune", "Pandaemonium", "Titan"],
+      "Meteor": ["Belias", "Mandragora", "Ramuh", "Shinryu", "Unicorn", "Valefor", "Yojimbo", "Zeromus"]
+    };
+    let masterCatalogList = [];
+    let globalWorldItemMaps = {};
+    let globalItemsCatalog = {};
+    const inFlightFetchMap = new Map();
+
+    // アイコンURLの動的計算アルゴリズム (アイテムIDからXIVAPI v2高画質PNGアイコンURLを100%自動算出)
+    function getComputedIconUrl(itemId) {
+      if (!itemId) return 'https://v2.xivapi.com/api/asset?path=ui/icon/020000/021001_hr1.tex&format=png';
+      const id = Number(itemId);
+      const folderNum = Math.floor(id / 1000) * 1000;
+      const folderStr = String(folderNum).padStart(6, '0');
+      const iconStr = String(id).padStart(6, '0');
+      return `https://v2.xivapi.com/api/asset?path=ui/icon/${folderStr}/${iconStr}_hr1.tex&format=png`;
+    }
+
+    // クリスタル・シャード・クラスター・触媒の判定関数 (ID: 2~19 判定含む)
+    function isCrystalItem(item) {
+      if (!item) return false;
+      const id = typeof item === 'number' ? item : Number(item.item_id || 0);
+      // FF14公式データ: シャード(2~7), クリスタル(8~13), クラスター(14~19)
+      if (id >= 2 && id <= 19) return true;
+      
+      if (typeof item === 'object') {
+        const cat = (item.meta && item.meta.category) ? item.meta.category : '';
+        if (cat === "クリスタル" || cat === "触媒") return true;
+        
+        const name = item.item_name || item.name || '';
+        if (name.includes("シャード") || name.includes("クリスタル") || name.includes("クラスター")) return true;
+      }
+      
+      return false;
+    }
+
+    function toggleCrystalFilter() {
+      excludeCrystals = !excludeCrystals;
+      const btns = document.querySelectorAll('#crystalFilterBtn, #pcCrystalFilterBtn, .crystal-filter-btn');
+      btns.forEach(btn => {
+        btn.classList.toggle('active', excludeCrystals);
+        btn.innerHTML = `<i class="fa-solid fa-gem"></i> ${excludeCrystals ? 'ON' : 'OFF'}`;
+      });
+      renderWorldGrid();
+    }
+
+
+
+    function setGlobalSort(mode) {
+      activeSortMode = mode;
+      document.querySelectorAll('.sort-toggle-group .sort-toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.sort === mode);
+      });
+
+      resetPcMonitorToNoData();
+      renderWorldGrid();
+
+      const itemList = document.querySelector('.world-item-list');
+      if (itemList) itemList.scrollTop = 0;
+    }
+
+
+
+    function formatTimeLocal(rawTimeStr) {
+      if (!rawTimeStr) return '-';
+      let str = String(rawTimeStr).trim();
+      if (!str.endsWith('Z') && !str.includes('+')) {
+        str = str.replace(' ', 'T') + 'Z';
+      }
+      const d = new Date(str);
+      if (isNaN(d.getTime())) return rawTimeStr;
+      
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}`;
+    }
+
+    // 過去1週間（今日を含めた7日間・日付切り捨て・JST基準）の厳密な範囲計算
+    // 例: 今日が水曜日なら、先週木曜日 00:00:00 JST から今日 23:59:59 JST までの7日間
+    function getWeekRangeJst(refDateStr = null) {
+      const now = refDateStr ? new Date(refDateStr) : new Date();
+      // JST 基準の現在年月日
+      const jstNow = new Date(now.getTime() + (9 * 3600 + now.getTimezoneOffset() * 60) * 1000);
+      const todayYear = jstNow.getFullYear();
+      const todayMonth = jstNow.getMonth();
+      const todayDate = jstNow.getDate();
+
+      // 6日前の 00:00:00 JST (今日を含めて合計7日間)
+      const labels = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(todayYear, todayMonth, todayDate - i);
+        const mStr = String(d.getMonth() + 1).padStart(2, '0');
+        const dStr = String(d.getDate()).padStart(2, '0');
+        labels.push(`${mStr}/${dStr}`);
+      }
+
+      // 始点の UNIX タイムスタンプ (秒) (例: 08/27 00:00:00 JST = UTC 08/26 15:00:00)
+      const startTs = Math.floor(Date.UTC(todayYear, todayMonth, todayDate - 6, -9, 0, 0) / 1000);
+      const startJst = new Date(todayYear, todayMonth, todayDate - 6);
+      const endJst = new Date(todayYear, todayMonth, todayDate);
+
+      return {
+        labels,
+        startTs,
+        startStr: `${startJst.getMonth() + 1}/${startJst.getDate()}`,
+        endStr: `${endJst.getMonth() + 1}/${endJst.getDate()}`
+      };
+    }
+
+    function getAggregationPeriodStr(rawTimeStr) {
+      const range = getWeekRangeJst(rawTimeStr);
+      return `${range.startStr}～${range.endStr}`;
+    }
+
+    let currentPeriodText = '';
+    let pcAnalyticsSearchTerm = '';
+    let pcArbitrageSearchTerm = '';
+    let analyticsSearchTimer = null;
+    let arbitrageSearchTimer = null;
+    let isComposing = false;
+
+    function preserveAndRestoreFocus(fn) {
+      const activeEl = document.activeElement;
+      const activeId = activeEl ? activeEl.id : null;
+      const startPos = activeEl && typeof activeEl.selectionStart === 'number' ? activeEl.selectionStart : null;
+      const endPos = activeEl && typeof activeEl.selectionEnd === 'number' ? activeEl.selectionEnd : null;
+
+      fn();
+
+      if (activeId && ['pcAnalyticsSearchInput', 'pcArbitrageSearchInput', 'searchInput', 'arbSearchInput'].includes(activeId)) {
+        requestAnimationFrame(() => {
+          const restoredInput = document.getElementById(activeId);
+          if (restoredInput) {
+            restoredInput.focus();
+            if (startPos !== null && endPos !== null) {
+              try {
+                restoredInput.setSelectionRange(startPos, endPos);
+              } catch (e) {}
+            }
+          }
+        });
+      }
+    }
+
+    function setupSearchImeListeners() {
+      ['pcAnalyticsSearchInput', 'pcArbitrageSearchInput', 'searchInput', 'arbSearchInput'].forEach(id => {
+        const input = document.getElementById(id);
+        if (!input || input.dataset.imeBound) return;
+        input.dataset.imeBound = "true";
+
+        input.addEventListener('compositionstart', () => {
+          isComposing = true;
+        });
+
+        input.addEventListener('compositionend', (e) => {
+          isComposing = false;
+          if (id === 'pcAnalyticsSearchInput' || id === 'searchInput') {
+            onSearchInput(e.target.value);
+          } else {
+            onArbSearchInput(e.target.value);
+          }
+        });
+      });
+    }
+
+    function onSearchInput(val) {
+      pcAnalyticsSearchTerm = val.toLowerCase().trim();
+      if (isComposing) return;
+      clearTimeout(analyticsSearchTimer);
+      analyticsSearchTimer = setTimeout(() => {
+        preserveAndRestoreFocus(() => {
+          renderWorldGrid();
+        });
+        setupSearchImeListeners();
+      }, 180);
+    }
+
+    function clearPcAnalyticsSearch() {
+      pcAnalyticsSearchTerm = '';
+      const input = document.getElementById('pcAnalyticsSearchInput') || document.getElementById('searchInput');
+      if (input) input.value = '';
+      renderWorldGrid();
+    }
+
+    function onArbSearchInput(val) {
+      pcArbitrageSearchTerm = val.toLowerCase().trim();
+      if (isComposing) return;
+      clearTimeout(arbitrageSearchTimer);
+      arbitrageSearchTimer = setTimeout(() => {
+        preserveAndRestoreFocus(() => {
+          renderArbitrageGrid();
+        });
+        setupSearchImeListeners();
+      }, 180);
+    }
+
+    function clearPcArbitrageSearch() {
+      pcArbitrageSearchTerm = '';
+      const input = document.getElementById('pcArbitrageSearchInput') || document.getElementById('arbSearchInput');
+      if (input) input.value = '';
+      renderArbitrageGrid();
+    }
+
+
+
+    const USER_WORLD_KEY = 'ff14_user_home_world';
+
+    function getSavedUserHomeWorld() {
+      try {
+        return localStorage.getItem(USER_WORLD_KEY) || null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function saveUserHomeWorld(worldName) {
+      if (!worldName) return;
+      try {
+        localStorage.setItem(USER_WORLD_KEY, worldName);
+        localStorage.setItem('ff14_selected_world', worldName);
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'SET_SHARED_WORLD', world: worldName }, '*');
+        }
+      } catch (e) {}
+    }
+
+    function applySharedWorldFromParent(worldName) {
+      if (!worldName) return;
+      try {
+        localStorage.setItem(USER_WORLD_KEY, worldName);
+        localStorage.setItem('ff14_selected_world', worldName);
+      } catch (e) {}
+
+      // 1. 市場分析のワールドセレクト
+      const pcSel = document.getElementById('pcWorldSelect');
+      if (pcSel && pcSel.value !== worldName) {
+        pcSel.value = worldName;
+        currentModalWorld = worldName;
+        const foundDc = findDcForWorld(worldName);
+        if (foundDc) activeDc = foundDc;
+        if (typeof renderWorldGrid === 'function') {
+          renderWorldGrid();
+        }
+      }
+
+      // 2. 金策ナビのホームワールドセレクト
+      const arbSel = document.getElementById('arbHomeWorldSelect');
+      if (arbSel && arbSel.value !== worldName) {
+        arbSel.value = worldName;
+        if (typeof updateArbitrageFilters === 'function') {
+          updateArbitrageFilters();
+        }
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, function(m) {
+        return {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        }[m];
+      });
+    }
+
+    let lastLoadedTime = null;
+
+    async function loadData() {
+      console.time('[FastLoad] Total Load Time');
+      const lastUpdatedEl = document.getElementById('lastUpdatedBadge');
+      if (lastUpdatedEl) {
+        lastUpdatedEl.innerHTML = `<span class="status-dot" style="background:#eab308;"></span> データを読み込み中...`;
+      }
+
+      try {
+        let data = null;
+
+        // 1. Fetch /data.json.gz
+        try {
+          console.log('[FastLoad] Starting fetch /data.json.gz ...');
+          const cacheBuster = '?t=' + Date.now();
+          const res = await fetchWithTimeout('/data.json.gz' + cacheBuster, { timeout: 25000, cache: 'no-cache' });
+          console.log('[FastLoad] /data.json.gz HTTP status:', res ? res.status : 'no response');
+
+          if (res && res.ok) {
+            const arrayBuffer = await res.arrayBuffer();
+            console.log('[FastLoad] Received buffer size:', arrayBuffer.byteLength);
+            const uint8 = new Uint8Array(arrayBuffer);
+
+            // Check if stream is raw gzip binary (Magic bytes 0x1f, 0x8b)
+            if (uint8.length >= 2 && uint8[0] === 0x1f && uint8[1] === 0x8b) {
+              console.log('[FastLoad] Raw gzip detected, ungzipping...');
+              if (window.pako) {
+                const decompressed = pako.ungzip(uint8, { to: 'string' });
+                data = JSON.parse(decompressed);
+              } else if (window.DecompressionStream) {
+                const ds = new DecompressionStream('gzip');
+                const blob = new Blob([arrayBuffer]);
+                const text = await new Response(blob.stream().pipeThrough(ds)).text();
+                data = JSON.parse(text);
+              }
+            } else {
+              console.log('[FastLoad] Already decompressed stream, decoding text...');
+              const decoder = new TextDecoder('utf-8');
+              const text = decoder.decode(uint8);
+              data = JSON.parse(text);
+            }
+            console.log('[FastLoad] JSON Parsed successfully. Worlds count:', Object.keys(data.data || {}).length);
+          }
+        } catch (gzErr) {
+          console.warn("[FastLoad] /data.json.gz fetch error:", gzErr);
+        }
+
+        // 2. Fallback to /data.json if needed
+        if (!data) {
+          try {
+            console.log('[FastLoad] Falling back to /data.json ...');
+            const res = await fetchWithTimeout('/data.json?t=' + Date.now(), { timeout: 25000, cache: 'no-cache' });
+            if (res && res.ok) {
+              data = await res.json();
+              console.log('[FastLoad] /data.json loaded successfully!');
+            }
+          } catch (jsonErr) {
+            console.warn('[FastLoad] /data.json fallback error:', jsonErr);
+          }
+        }
+
+        if (!data) {
+          throw new Error('データファイルの取得・解凍に失敗しました。');
+        }
+
+        if (data.last_updated) {
+          currentPeriodText = getAggregationPeriodStr(data.last_updated);
+        }
+
+        if (lastUpdatedEl) {
+          const formattedLastUpdated = formatTimeLocal(data.last_updated);
+          const periodBadgeHtml = currentPeriodText ? `<span style="color:var(--accent-blue); font-weight:600;"><i class="fa-regular fa-calendar-days"></i> 集計期間: ${currentPeriodText}</span> <span style="opacity:0.35; margin:0 6px;">|</span> ` : '';
+          lastUpdatedEl.innerHTML = `<span class="status-dot"></span> ${periodBadgeHtml}最終更新: ${formattedLastUpdated}`;
+        }
+
+        if (lastLoadedTime && lastLoadedTime === data.last_updated) {
+          console.timeEnd('[FastLoad] Total Load Time');
+          return;
+        }
+        lastLoadedTime = data.last_updated;
+
+        allData = data.data || data.worlds || {};
+        if (data.items) {
+          const itemsMap = data.items;
+          for (const w in allData) {
+            const list = allData[w];
+            for (let i = 0; i < list.length; i++) {
+              const itm = list[i];
+              const meta = itemsMap[itm.item_id];
+              if (meta) {
+                itm.item_name = meta.name || itm.item_name;
+                itm.icon_url = meta.icon || itm.icon_url;
+                itm.category_name = meta.category || itm.category_name;
+              }
+            }
+          }
+        }
+        if (data.dc_worlds) {
+          dcWorldsMap = data.dc_worlds;
+        }
+
+        // Expose to window and parent React app for 100% memory sharing without redundant network requests
+        window.allData = allData;
+        window.dcWorldsMap = dcWorldsMap;
+        if (window.parent && window.parent !== window) {
+          try {
+            window.parent.__FF14_MARKET_DATA__ = allData;
+            window.parent.__FF14_DC_WORLDS__ = dcWorldsMap;
+            window.parent.__FF14_ITEMS_CATALOG__ = data.items || {};
+            window.parent.dispatchEvent(new CustomEvent('FF14_DATA_READY', {
+              detail: { allData, dcWorldsMap, itemsCatalog: data.items || {} }
+            }));
+          } catch (e) {
+            console.warn('Could not assign to parent window:', e);
+          }
+        }
+
+        // Build fast master catalog from full item metadata (including 0-sales items across all 32 worlds)
+        const catalogMap = new Map();
+        const itemsCatalog = data.items || {};
+        globalItemsCatalog = itemsCatalog;
+
+        // 1. 全品目マスターカタログ (50,798件) から登録 (取引が全ワールドで0件のアイテムも100%完全網羅)
+        for (const idStr in itemsCatalog) {
+          const meta = itemsCatalog[idStr];
+          const iid = Number(idStr);
+          catalogMap.set(`${iid}_nq`, {
+            item_id: iid,
+            item_name: meta.name || `Item #${iid}`,
+            icon_url: meta.icon || getComputedIconUrl(iid),
+            category_name: meta.category || 'その他',
+            hq: false,
+            min_price: 0,
+            avg_price: 0,
+            max_price: 0,
+            sale_velocity: 0,
+            sale_trades: 0,
+            daily_revenue: 0,
+            daily_trend: [],
+            history: []
+          });
+        }
+
+        // 2. 取引実績があるアイテムのデータで上書きマージ
+        for (const w in allData) {
+          const list = allData[w] || [];
+          for (let i = 0; i < list.length; i++) {
+            const item = list[i];
+            const iid = item.item_id || item.id;
+            const itemKey = `${iid}_${item.hq ? 'hq' : 'nq'}`;
+          }
+        }
+        masterCatalogList = Array.from(catalogMap.values());
+
+        // Build global fast item maps for 32 worlds for 0ms arbitrage calculations
+        globalWorldItemMaps = {};
+        for (const w in allData) {
+          const list = allData[w] || [];
+          globalWorldItemMaps[w] = new Map(list.map(x => [`${x.item_id || x.id}_${x.hq ? 'hq' : 'nq'}`, x]));
+        }
+
+        const savedHomeWorld = getSavedUserHomeWorld();
+        if (savedHomeWorld) {
+          currentModalWorld = savedHomeWorld;
+          const foundDc = findDcForWorld(savedHomeWorld);
+          if (foundDc) activeDc = foundDc;
+        }
+
+        const loader = document.getElementById('loadingOverlay');
+        if (loader) loader.style.display = 'none';
+
+        console.time('[FastLoad] DOM Render');
+        renderWorldGrid();
+        setupSearchImeListeners();
+        console.timeEnd('[FastLoad] DOM Render');
+
+        // URL view parameter support for modular embedding (?view=arbitrage)
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialView = urlParams.get('view');
+        if (initialView === 'arbitrage') {
+          switchMainViewMode('arbitrage');
+        }
+
+        console.timeEnd('[FastLoad] Total Load Time');
+
+      } catch (err) {
+        console.error("loadData error:", err);
+        if (lastUpdatedEl) {
+          lastUpdatedEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:var(--accent-red);"></i> ロード失敗 (${err.message})`;
+        }
+        const grid = document.getElementById('worldGrid');
+        if (grid) {
+          grid.innerHTML = `
+            <div style="text-align:center; padding:3rem; width:100%; color:#ef4444; grid-column: 1 / -1;">
+              <i class="fa-solid fa-triangle-exclamation fa-2x"></i><br><br>データ取得エラー (${err.message})
+            </div>
+          `;
+        }
+      }
+    }
+
+    function findDcForWorld(worldName) {
+      if (!worldName) return null;
+      for (const [dc, worlds] of Object.entries(dcWorldsMap || {})) {
+        if (worlds.includes(worldName)) return dc;
+      }
+      return null;
+    }
+
+    function getOrComputeDailyTrend(item) {
+      if (!item) return { trend: [], trendPct: 0 };
+      const weekRange = getWeekRangeJst();
+      const targetLabels = weekRange.labels; // 例: ['08/27', '08/28', '08/29', '08/30', '08/31', '09/01', '09/02']
+
+      let trend = [];
+      if (item.daily_trend && item.daily_trend.length > 0) {
+        // daily_trend がある場合は、7日間のラベルに合致するもののみを厳密抽出
+        const dtMap = new Map(item.daily_trend.map(d => [d.date, d]));
+        trend = targetLabels.map(lbl => dtMap.get(lbl) || { date: lbl, weighted_avg: 0, volume: 0 });
+      } else {
+        // history から厳密に7日間の日別加重平均と出来高を計算
+        const history = (item.history || []).filter(h => !h.ts || h.ts >= weekRange.startTs);
+        const dayMap = new Map();
+        targetLabels.forEach(lbl => dayMap.set(lbl, { rev: 0, qty: 0 }));
+
+        for (const h of history) {
+          if (!h.ts) continue;
+          const d = new Date(h.ts * 1000);
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const lbl = `${month}/${day}`;
+          if (dayMap.has(lbl)) {
+            const entry = dayMap.get(lbl);
+            entry.rev += (h.price || 0) * (h.qty || 1);
+            entry.qty += (h.qty || 1);
+          }
+        }
+
+        trend = targetLabels.map(lbl => {
+          const entry = dayMap.get(lbl);
+          const wavg = entry.qty > 0 ? Math.round(entry.rev / entry.qty) : 0;
+          return { date: lbl, weighted_avg: wavg, volume: entry.qty };
+        });
+      }
+
+      // トレンド騰落率の計算
+      const validAvgs = trend.map(d => d.weighted_avg || 0).filter(p => p > 0);
+      let trendPct = item.trend_pct || 0;
+      if (validAvgs.length >= 2 && validAvgs[0] > 0) {
+        trendPct = Math.round(((validAvgs[validAvgs.length - 1] - validAvgs[0]) / validAvgs[0]) * 1000) / 10;
+      }
+
+      return { trend, trendPct };
+    }
+
+    function buildTrendBadgeHtml(trendPct, options = {}) {
+      const fontSize = options.fontSize || '0.65rem';
+      const titleAttr = options.title ? `title="${options.title}"` : '';
+      const suffix = options.labelSuffix ? ` ${options.labelSuffix}` : '';
+      if (trendPct > 0) {
+        return `<span style="color:#4ade80; font-weight:700; font-size:${fontSize};" ${titleAttr}><i class="fa-solid fa-arrow-trend-up"></i> +${trendPct}%${suffix}</span>`;
+      } else if (trendPct < 0) {
+        return `<span style="color:#f87171; font-weight:700; font-size:${fontSize};" ${titleAttr}><i class="fa-solid fa-arrow-trend-down"></i> ${trendPct}%${suffix}</span>`;
+      }
+      return `<span style="color:#94a3b8; font-size:${fontSize};" ${titleAttr}>➡️ 0%${suffix}</span>`;
+    }
+
+    function buildHistoryRowHtml(h) {
+      const formattedTime = formatTimeLocal(new Date(h.ts * 1000).toISOString());
+      const buyerName = h.buyer ? escapeHtml(h.buyer) : `<span style="color:var(--text-muted); font-size:0.75rem;">-</span>`;
+      const hqBadge = h.hq ? `<span class="hq-badge">HQ</span>` : `<span style="color:var(--text-muted); font-size:0.75rem;">NQ</span>`;
+      const price = (h.price || 0).toLocaleString();
+      const qty = (h.qty || 0).toLocaleString();
+      const totalPrice = ((h.price || 0) * (h.qty || 0)).toLocaleString();
+
+      return `
+        <tr>
+          <td style="font-size:0.75rem; color:var(--text-muted);"><i class="fa-regular fa-clock"></i> ${formattedTime}</td>
+          <td style="font-size:0.75rem; font-weight:600; color:var(--accent-blue);">${buyerName}</td>
+          <td>${hqBadge}</td>
+          <td style="font-weight:700; color:var(--accent-green);">${price}G</td>
+          <td>${qty}個</td>
+          <td style="font-weight:700; color:#ffb703;">${totalPrice}G</td>
+        </tr>
+      `;
+    }
+
+    function generateSparklineSvg(item, width = 64, height = 18) {
+      const { trend, trendPct } = getOrComputeDailyTrend(item);
+      if (!trend || trend.length < 2) return '';
+      const validPoints = trend.map(d => d.weighted_avg || 0);
+      const nonZero = validPoints.filter(p => p > 0);
+      if (nonZero.length < 2) return '';
+
+      const minP = Math.min(...nonZero);
+      const maxP = Math.max(...nonZero);
+      const range = (maxP - minP) || 1;
+
+      const coords = validPoints.map((p, idx) => {
+        const x = (idx / (validPoints.length - 1)) * (width - 6) + 3;
+        const val = p > 0 ? p : minP;
+        const y = height - 3 - (((val - minP) / range) * (height - 6));
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      });
+
+      const isUp = (trendPct >= 0);
+      const color = isUp ? '#4ade80' : '#f87171';
+
+      return `
+        <svg width="${width}" height="${height}" style="vertical-align:middle; overflow:visible;">
+          <polyline fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" points="${coords.join(' ')}" />
+        </svg>
+      `;
+    }
+
+    function drawTrendChart(canvasId, summaryId, trend, trendPct, options = {}) {
+      const canvas = document.getElementById(canvasId);
+      const summaryEl = document.getElementById(summaryId);
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      const defaultW = options.defaultWidth || 580;
+      const h = canvas.height = options.height || 120;
+      const w = canvas.width = canvas.parentElement ? (canvas.parentElement.offsetWidth || defaultW) : defaultW;
+
+      ctx.clearRect(0, 0, w, h);
+
+      if (!trend || trend.length === 0) {
+        if (summaryEl) summaryEl.innerHTML = "";
+        return;
+      }
+
+      if (summaryEl) {
+        summaryEl.style.display = 'flex';
+        summaryEl.style.justifyContent = 'space-between';
+        summaryEl.style.gap = '2px';
+        const minW = options.summaryMinW || '45px';
+        const fontSizeDate = options.summaryDateFontSize || '0.65rem';
+        const fontSizeVal = options.summaryValFontSize || '0.65rem';
+        const fontSizeVol = options.summaryVolFontSize || '0.6rem';
+
+        summaryEl.innerHTML = trend.map(d => `
+          <div style="flex:1; text-align:center; min-width:${minW};">
+            <div style="font-weight:700; color:#94a3b8; font-size:${fontSizeDate};">${d.date}</div>
+            <div style="color:var(--accent-green); font-weight:700; font-size:${fontSizeVal};">${d.weighted_avg > 0 ? d.weighted_avg.toLocaleString() + 'G' : '-'}</div>
+            <div style="color:var(--accent-blue); font-size:${fontSizeVol};">${d.volume > 0 ? d.volume + '個' : '0個'}</div>
+          </div>
+        `).join('');
+      }
+
+      const validPrices = trend.map(d => d.weighted_avg || 0).filter(p => p > 0);
+      const validVolumes = trend.map(d => d.volume || 0);
+      const maxVol = Math.max(...validVolumes, 1);
+
+      if (validPrices.length === 0) return;
+
+      const minP = Math.min(...validPrices);
+      const maxP = Math.max(...validPrices);
+      const pRange = (maxP - minP) || (maxP * 0.1) || 1;
+
+      const numPoints = trend.length;
+      const colWidthHalf = w / (2 * Math.max(1, numPoints));
+      const paddingLeft = options.paddingLeft || colWidthHalf;
+      const paddingRight = options.paddingRight || colWidthHalf;
+      const paddingTop = options.paddingTop || 12;
+      const paddingBottom = options.paddingBottom || 18;
+      const plotW = w - paddingLeft - paddingRight;
+      const plotH = h - paddingTop - paddingBottom;
+      const stepX = plotW / Math.max(1, numPoints - 1);
+
+      if (options.drawGrid) {
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, paddingTop);
+        ctx.lineTo(w - paddingRight, paddingTop);
+        ctx.moveTo(paddingLeft, paddingTop + plotH / 2);
+        ctx.lineTo(w - paddingRight, paddingTop + plotH / 2);
+        ctx.moveTo(paddingLeft, h - paddingBottom);
+        ctx.lineTo(w - paddingRight, h - paddingBottom);
+        ctx.stroke();
+      }
+
+      trend.forEach((d, idx) => {
+        const x = paddingLeft + idx * stepX;
+        const barW = Math.min(options.maxBarW || 16, stepX * 0.4);
+        const barH = (d.volume / maxVol) * (plotH * (options.barHFactor || 0.55));
+        const y = h - paddingBottom - barH;
+
+        ctx.fillStyle = "rgba(96, 165, 250, 0.25)";
+        ctx.fillRect(x - barW / 2, y, barW, barH);
+      });
+
+      const points = [];
+      trend.forEach((d, idx) => {
+        const x = paddingLeft + idx * stepX;
+        const val = d.weighted_avg > 0 ? d.weighted_avg : minP;
+        const y = h - paddingBottom - (((val - minP) / pRange) * plotH);
+        points.push({ x, y, val: d.weighted_avg, date: d.date });
+      });
+
+      const lineColor = trendPct >= 0 ? "#4ade80" : "#f87171";
+
+      const grad = ctx.createLinearGradient(0, paddingTop, 0, h - paddingBottom);
+      grad.addColorStop(0, trendPct >= 0 ? "rgba(74, 222, 128, 0.25)" : "rgba(248, 113, 113, 0.25)");
+      grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.lineTo(points[points.length - 1].x, h - paddingBottom);
+      ctx.lineTo(points[0].x, h - paddingBottom);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.strokeStyle = lineColor;
+      ctx.lineWidth = options.lineWidth || 2;
+      ctx.stroke();
+
+      const dotRadius = options.dotRadius || 3;
+      const dateYOffset = options.dateYOffset || 6;
+      const dateFontSize = options.dateFontSize || "9px";
+
+      points.forEach((pt) => {
+        ctx.fillStyle = lineColor;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, dotRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = `${dateFontSize} sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText(pt.date, pt.x, h - dateYOffset);
+      });
+
+      if (summaryEl) {
+        const fontSizeDate = options.summaryDateFontSize || '0.65rem';
+        const fontSizeVal = options.summaryValFontSize || '0.65rem';
+        const fontSizeVol = options.summaryVolFontSize || '0.6rem';
+
+        summaryEl.style.position = 'static';
+        summaryEl.style.display = 'flex';
+        summaryEl.style.justifyContent = 'space-between';
+        summaryEl.style.alignItems = 'center';
+        summaryEl.style.width = '100%';
+        summaryEl.style.boxSizing = 'border-box';
+        summaryEl.style.paddingLeft = '0px';
+        summaryEl.style.paddingRight = '0px';
+        summaryEl.style.marginTop = '4px';
+
+        summaryEl.innerHTML = trend.map((d) => {
+          const formattedVal = d.weighted_avg > 0 ? (d.weighted_avg >= 10000 ? Math.round(d.weighted_avg / 1000) + 'k' : d.weighted_avg.toLocaleString()) + 'G' : '-';
+          return `
+            <div style="flex:1; min-width:0; text-align:center; white-space:nowrap; overflow:hidden;">
+              <span style="font-weight:700; color:#94a3b8; font-size:${fontSizeDate}; display:block;">${d.date}</span>
+              <span style="color:var(--accent-green); font-weight:700; font-size:${fontSizeVal}; display:block; margin:1px 0;">${formattedVal}</span>
+              <span style="color:var(--accent-blue); font-size:${fontSizeVol}; display:block;">${d.volume > 0 ? d.volume + '個' : '0個'}</span>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+
+
+    function renderWorldGrid(forceFull = false) {
+      const grid = document.getElementById('worldGrid');
+      if (!grid) return;
+
+      if (currentModalWorld) {
+        const foundDc = findDcForWorld(currentModalWorld);
+        if (foundDc) activeDc = foundDc;
+      }
+      const worlds = dcWorldsMap[activeDc] || Object.values(dcWorldsMap)[0] || [];
+      const selectedWorld = currentModalWorld || worlds[0] || "Carbuncle";
+      const renderWorlds = [selectedWorld];
+      
+      // Build PC World Dropdown HTML
+      let pcSelectHtml = '';
+      let optGroups = '';
+        for (const [dcName, wList] of Object.entries(dcWorldsMap || {})) {
+          optGroups += '<optgroup label="' + dcName + ' DC">';
+          for (const w of wList) {
+            const isSel = (w === (currentModalWorld || worlds[0])) ? 'selected' : '';
+            optGroups += '<option value="' + w + '" ' + isSel + '>🌐 ' + w + ' (' + dcName + ')</option>';
+          }
+          optGroups += '</optgroup>';
+        }
+        pcSelectHtml = '<select class="pc-world-select" id="pcWorldSelect" style="flex:1; width:100%; font-size:0.88rem; font-weight:600; padding:6px 8px; border-radius:8px;" onchange="onPcWorldSelectChange(this.value)">' + optGroups + '</select>';
+
+      const worldName = selectedWorld;
+      // Prepare items for this world with world-specific metrics
+      const activeSearch = pcAnalyticsSearchTerm;
+        let worldItems = [];
+
+        if (activeSearch) {
+          // 検索時: 事前インデックス (masterCatalogList: 約4,000件) から高速一致抽出 (13万回ループを完全撤廃)
+          const matchedMaster = masterCatalogList.filter(item => {
+            const name = (item.item_name || '').toLowerCase();
+            const idStr = String(item.item_id || item.id || '');
+            return name.includes(activeSearch) || idStr.includes(activeSearch);
+          });
+
+          const targetWorldItems = allData[worldName] || [];
+          const targetWorldMap = new Map(targetWorldItems.map(it => [`${it.item_id || it.id}_${it.hq ? 'hq' : 'nq'}`, it]));
+
+          worldItems = matchedMaster.map(mItem => {
+            const iid = mItem.item_id || mItem.id;
+            const itemKey = `${iid}_${mItem.hq ? 'hq' : 'nq'}`;
+            if (targetWorldMap.has(itemKey)) {
+              return targetWorldMap.get(itemKey);
+            }
+            return {
+              ...mItem,
+              min_price: 0,
+              avg_price: 0,
+              max_price: 0,
+              sale_velocity: 0,
+              sale_trades: 0,
+              daily_revenue: 0,
+              daily_trend: [],
+              history: []
+            };
+          });
+
+          if (excludeCrystals) {
+            worldItems = worldItems.filter(item => !isCrystalItem(item));
+          }
+        } else {
+          worldItems = (allData[worldName] || []).filter(item => {
+            if ((item.sale_trades || 0) <= 0) return false;
+            if (excludeCrystals && isCrystalItem(item)) return false;
+            return true;
+          });
+        }
+
+        // Sort worldItems by activeSortMode
+        let sortedItems;
+        if (activeSearch) {
+          sortedItems = [...worldItems].sort((a, b) => (b.sale_velocity || 0) - (a.sale_velocity || 0));
+        } else if (activeSortMode === 'revenue') {
+          sortedItems = worldItems.filter(item => (item.sale_velocity || 0) >= 1.0 || isCrystalItem(item))
+            .sort((a, b) => ((b.avg_price || 0) * (b.sale_velocity || 0)) - ((a.avg_price || 0) * (a.sale_velocity || 0)));
+        } else if (activeSortMode === 'max_price') {
+          sortedItems = worldItems.filter(item => (item.max_price || 0) > 0 && (item.sale_trades || 0) > 0 && (((item.avg_price || 0) / item.max_price) >= 0.35))
+            .sort((a, b) => (b.max_price || 0) - (a.max_price || 0));
+        } else if (activeSortMode === 'min_price') {
+          sortedItems = [...worldItems].sort((a, b) => (b.min_price || 0) - (a.min_price || 0));
+        } else {
+          sortedItems = [...worldItems].sort((a, b) => (b.sale_velocity || 0) - (a.sale_velocity || 0));
+        }
+
+        // 検索時はヒット全件(無制限)表示、通常時は上位30件表示！
+        const displayItems = activeSearch ? sortedItems : sortedItems.slice(0, 30);
+
+        const cardListHtml = displayItems.length === 0 ? `
+          <div style="text-align:center; padding:2rem; color:var(--text-muted); font-size:0.82rem;">
+            プールデータ未登録（データ収集待ち）
+          </div>
+        ` : displayItems.map((item, idx) => {
+          let displayTitle = item.item_name || `Item #${item.item_id}`;
+          let cleanTitle = escapeHtml(displayTitle).replace(/\s*\[(NQ|HQ)\]\s*$/i, "").trim();
+
+          const cMin = (item.min_price || 0).toLocaleString();
+          const cAvg = Math.round(item.avg_price || 0).toLocaleString();
+          const cMax = (item.max_price || 0).toLocaleString();
+          const cStock = (item.units_for_sale || 0).toLocaleString();
+          const cVel = (item.sale_velocity || 0).toLocaleString();
+          const cTrades = Math.round((item.sale_trades || 0) / 7.0).toLocaleString();
+          
+          // 日商（流通ギル = 平均単価 × 日当売買数）
+          const dailyRevenue = Math.round((item.avg_price || 0) * (item.sale_velocity || 0)).toLocaleString();
+
+          // アイコンURL動的計算 ＆ 多重フォールバック構成
+          const computedIcon = getComputedIconUrl(item.item_id);
+          let primaryIcon = (item.icon_url && !item.icon_url.includes("021001_hr1")) ? item.icon_url : computedIcon;
+          const safeFallback = 'https://v2.xivapi.com/api/asset?path=ui/icon/020000/021001_hr1.tex&format=png';
+
+          const iconImg = `<img class="item-icon" src="${primaryIcon}" alt="" loading="lazy" decoding="async" onerror="if(this.src !== '${computedIcon}') { this.src='${computedIcon}'; } else { this.onerror=null; this.src='${safeFallback}'; }">`;
+
+          const lodestoneUrl = `https://jp.finalfantasyxiv.com/lodestone/playguide/db/item/?patch=&db_search_category=item&category2=&q=${encodeURIComponent(displayTitle)}`;
+
+          const { trendPct } = getOrComputeDailyTrend(item);
+          const trendBadge = buildTrendBadgeHtml(trendPct, { fontSize: '0.65rem', title: '7日平均価格推移' });
+
+          const sparklineHtml = generateSparklineSvg(item, 48, 14);
+          const isHqItem = Boolean(item.hq);
+          const activeCardClass = (pcMonitorItemId && item.item_id === pcMonitorItemId && Boolean(pcMonitorIsHq) === isHqItem) ? ' active-card' : '';
+          const hqBadgeTag = isHqItem ? `<span class="hq-badge" style="font-size:0.65rem; padding:1px 4px; border-radius:4px; background:rgba(234,179,8,0.25); border:1px solid rgba(234,179,8,0.6); color:var(--accent-gold); font-weight:800; margin-left:4px;">HQ</span>` : '';
+
+          return `
+            <div class="item-card${activeCardClass}" data-item_id="${item.item_id}" data-hq="${isHqItem ? '1' : '0'}" data-velocity="${item.sale_velocity || 0}" data-avg_price="${item.avg_price || 0}" data-min_price="${item.min_price || 0}" onclick="handleCardClick(${item.item_id}, '${escapeHtml(cleanTitle).replace(/'/g, "\\'")}', '${primaryIcon}', '${worldName}', '${escapeHtml(item.category_name || '').replace(/'/g, "\\'")}', ${isHqItem})" title="クリックで右モニターに詳細を出力">
+              <!-- ヘッダー: アイコン + 順位 + 品名 + トレンドスパークライン + 外部リンク -->
+              <div class="item-card-header">
+                ${iconImg}
+                <div class="item-header-text">
+                  <div class="item-card-title">
+                    <span class="rank-tag">#${idx + 1}</span>
+                    <span style="font-weight:700;">${cleanTitle}</span>
+                    ${hqBadgeTag}
+                    <span style="display:inline-flex; align-items:center; gap:4px; margin-left:auto;">${sparklineHtml} ${trendBadge}</span>
+                    <a href="${lodestoneUrl}" target="_blank" rel="noopener" class="lodestone-link-icon" title="Lodestoneで検索" onclick="event.stopPropagation()">
+                      <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 内枠: 左右完全同期3行グリッド (1行目=売買数/最安, 2行目=件数/平均, 3行目=流通/最高) -->
+              <div class="item-section-box latest-box" style="padding: 6px 10px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; row-gap: 4px; column-gap: 12px; align-items: stretch;">
+                  
+                  <!-- 行1: 左=売買数 | 右=最安値 -->
+                  <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.72rem; display: flex; align-items: center; justify-content: space-between; border-right: 1px solid rgba(255, 255, 255, 0.08); padding-right: 8px; height: 22px; min-height: 22px;">
+                    <span class="lbl" style="color: #94a3b8; font-size: 0.66rem; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-bolt" style="color: var(--accent-blue); width: 12px; text-align: center;"></i> 売買数:</span>
+                    <strong style="color: var(--accent-blue); font-size: 0.76rem;">${cVel}個/日</strong>
+                  </div>
+                  <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.72rem; display: flex; align-items: center; justify-content: space-between; height: 22px; min-height: 22px;">
+                    <span class="lbl" style="color: #94a3b8; font-size: 0.66rem; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-tag" style="color: #38bdf8; width: 12px; text-align: center;"></i> 最安:</span>
+                    <strong style="color: #38bdf8; font-size: 0.76rem;">${cMin}G</strong>
+                  </div>
+
+                  <!-- 行2: 左=件数 | 右=平均値 -->
+                  <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.72rem; display: flex; align-items: center; justify-content: space-between; border-right: 1px solid rgba(255, 255, 255, 0.08); padding-right: 8px; height: 22px; min-height: 22px;">
+                    <span class="lbl" style="color: #94a3b8; font-size: 0.66rem; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-receipt" style="color: #a855f7; width: 12px; text-align: center;"></i> 件数:</span>
+                    <strong style="color: #a855f7; font-size: 0.76rem;">${cTrades}件/日</strong>
+                  </div>
+
+                  <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.72rem; display: flex; align-items: center; justify-content: space-between; height: 22px; min-height: 22px;">
+                    <span class="lbl" style="color: #94a3b8; font-size: 0.66rem; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-scale-balanced" style="color: #c084fc; width: 12px; text-align: center;"></i> 平均:</span>
+                    <strong style="color: #c084fc; font-size: 0.76rem;">${cAvg}G</strong>
+                  </div>
+
+                  <!-- 行3: 左=流通ギル | 右=最高値 -->
+                  <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.72rem; display: flex; align-items: center; justify-content: space-between; border-right: 1px solid rgba(255, 255, 255, 0.08); padding-right: 8px; height: 22px; min-height: 22px;">
+                    <span class="lbl" style="color: #94a3b8; font-size: 0.66rem; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-coins" style="color: #ffb703; width: 12px; text-align: center;"></i> 流通:</span>
+                    <strong style="color: #ffb703; font-size: 0.76rem;">${dailyRevenue}G/日</strong>
+                  </div>
+                  <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.72rem; display: flex; align-items: center; justify-content: space-between; height: 22px; min-height: 22px;">
+                    <span class="lbl" style="color: #94a3b8; font-size: 0.66rem; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-arrow-trend-up" style="color: #f472b6; width: 12px; text-align: center;"></i> 最高:</span>
+                    <strong style="color: #f472b6; font-size: 0.76rem;">${cMax}G</strong>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        const pcHeaderHtml = `
+          <div class="left-pane-header">
+            <!-- 1行目: ソート切り替えタブ (売買数/流通ギル/高額取引 ※💎除去) ＋ クリスタルON/OFFボタン -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px;">
+              <div class="sort-toggle-group" style="display: flex; gap: 3px; background: rgba(0,0,0,0.4); padding: 3px; border-radius: 8px; border: 1px solid var(--card-border); flex: 1;">
+                <button class="sort-toggle-btn ${activeSortMode === 'velocity' ? 'active' : ''}" data-sort="velocity" onclick="setGlobalSort('velocity')" style="flex:1; padding: 4px 6px; font-size: 0.74rem;">売買数</button>
+                <button class="sort-toggle-btn ${activeSortMode === 'revenue' ? 'active' : ''}" data-sort="revenue" onclick="setGlobalSort('revenue')" style="flex:1; padding: 4px 6px; font-size: 0.74rem;">流通ギル</button>
+                <button class="sort-toggle-btn ${activeSortMode === 'max_price' ? 'active' : ''}" data-sort="max_price" onclick="setGlobalSort('max_price')" style="flex:1; padding: 4px 6px; font-size: 0.74rem;">高額取引</button>
+              </div>
+              <button class="filter-toggle-btn crystal-filter-btn ${excludeCrystals ? 'active' : ''}" id="pcCrystalFilterBtn" onclick="toggleCrystalFilter()" title="クリスタル類の表示/除外" style="padding: 4px 8px; font-size: 0.74rem; border-radius: 8px; white-space: nowrap;">
+                <i class="fa-solid fa-gem"></i> ${excludeCrystals ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            <!-- 2行目: ワールド選択ラベル ＋ ドロップダウン -->
+            <div style="display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 6px;">
+              <span style="font-size: 0.88rem; font-weight: 700; color: #94a3b8; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                <i class="fa-solid fa-globe" style="color: var(--accent-blue);"></i> ワールド選択:
+              </span>
+              ${pcSelectHtml}
+            </div>
+            <!-- 3行目: ワールド選択直下の全3200品目検索ボックス -->
+            <div style="position: relative; width: 100%;">
+              <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 0.82rem; color: #94a3b8;"></i>
+              <input type="text" id="pcAnalyticsSearchInput" class="search-input" value="${pcAnalyticsSearchTerm}" placeholder="アイテム検索..." style="width: 100%; padding: 6px 28px 6px 30px; font-size: 0.88rem; font-weight: 600; border-radius: 8px;" oninput="onSearchInput(this.value)">
+              ${pcAnalyticsSearchTerm ? `<i class="fa-solid fa-xmark" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.88rem; color: #94a3b8; cursor: pointer;" onclick="clearPcAnalyticsSearch()"></i>` : ''}
+            </div>
+          </div>
+        `;
+
+      const existingCol = document.getElementById(`world-col-${worldName}`);
+      if (existingCol && !forceFull) {
+        const itemList = existingCol.querySelector('.world-item-list');
+        if (itemList) itemList.innerHTML = cardListHtml;
+        const searchInput = existingCol.querySelector('#pcAnalyticsSearchInput');
+        const clearIcon = existingCol.querySelector('.fa-xmark');
+        if (searchInput && searchInput.parentElement) {
+          if (pcAnalyticsSearchTerm && !clearIcon) {
+            searchInput.parentElement.insertAdjacentHTML('beforeend', `<i class="fa-solid fa-xmark" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.88rem; color: #94a3b8; cursor: pointer;" onclick="clearPcAnalyticsSearch()"></i>`);
+          } else if (!pcAnalyticsSearchTerm && clearIcon) {
+            clearIcon.remove();
+          }
+        }
+      } else {
+        grid.innerHTML = `
+          <div class="world-column" id="world-col-${worldName}" style="flex: 1; height: 100%; min-height: 0; display: flex; flex-direction: column; width: 100%; overflow: hidden;">
+            ${pcHeaderHtml}
+            <div class="world-item-list" style="flex: 1; height: 100%; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 0.8rem; padding-right: 4px;">
+              ${cardListHtml}
+            </div>
+          </div>
+        `;
+      }
+
+      // PC環境: 品目が選択中であれば新ワールドで同一品目を継続表示。未選択なら NO DATA 状態を維持
+      if (pcMonitorItemId) {
+        const targetWorld = renderWorlds[0];
+        const worldItems = allData[targetWorld] || [];
+        const found = worldItems.find(x => x.item_id === pcMonitorItemId);
+        if (found) {
+          const rawName = found.item_name || found.name || pcMonitorItemName || '';
+          const cleanName = rawName.replace(/^HQ\s*/i, '').replace(/\s*\[(NQ|HQ)\]\s*$/i, '').trim();
+          const icon = found.icon_url ? (found.icon_url.startsWith('http') ? found.icon_url : 'https://ff14-market-tracker.pages.dev/' + found.icon_url) : (pcMonitorIconUrl || '');
+          selectPcMonitorItem(found.item_id, cleanName || pcMonitorItemName, icon, targetWorld);
+        } else if (pcMonitorItemName) {
+          selectPcMonitorItem(pcMonitorItemId, pcMonitorItemName, pcMonitorIconUrl || '', targetWorld);
+        }
+      }
+    }
+
+    function switchPcWorld(worldName) {
+      if (!worldName) return;
+      onPcWorldSelectChange(worldName);
+    }
+
+    function onPcWorldSelectChange(selectedWorld) {
+      currentModalWorld = selectedWorld;
+      saveUserHomeWorld(selectedWorld);
+      const foundDc = findDcForWorld(selectedWorld);
+      if (foundDc) activeDc = foundDc;
+      renderWorldGrid();
+    }
+
+
+
+    function handleCardClick(itemId, itemName, iconUrl, worldName, categoryName, isHq = false) {
+      selectPcMonitorItem(itemId, itemName, iconUrl, worldName, isHq);
+    }
+
+    let pcMonitorItemId = null;
+    let pcMonitorItemName = null;
+    let pcMonitorIconUrl = null;
+    let pcMonitorWorldName = null;
+    let pcMonitorIsHq = false;
+
+    function resetPcAnalyticsMonitorToDefault() {
+      const wrapper = document.getElementById('analyticsMonitorWrapper');
+      if (!wrapper) return;
+      wrapper.innerHTML = `
+        <div style="text-align:center; padding:3.5rem; color:var(--text-muted); display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%;">
+          <div style="width:84px; height:84px; border-radius:50%; background:rgba(0, 210, 255, 0.08); border:1px solid rgba(0, 210, 255, 0.25); display:flex; align-items:center; justify-content:center; margin-bottom:1.25rem; box-shadow:0 0 35px rgba(0, 210, 255, 0.15);">
+            <i class="fa-solid fa-chart-line" style="font-size:2.5rem; color:var(--accent-blue);"></i>
+          </div>
+          <div style="font-size:1.25rem; font-weight:800; color:#ffffff; margin-bottom:0.5rem;">品目を選択してください</div>
+          <div style="font-size:0.85rem; color:#94a3b8; max-width:380px; line-height:1.6;">左側のカード一覧からアイテムを選択すると全32ワールドの価格比較と推移が表示されます</div>
+        </div>
+      `;
+    }
+
+    function resetPcArbitrageMonitorToDefault() {
+      const wrapper = document.getElementById('arbitrageMonitorWrapper');
+      if (!wrapper) return;
+      wrapper.innerHTML = `
+        <div style="text-align:center; padding:3.5rem; color:var(--text-muted); display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%;">
+          <div style="width:84px; height:84px; border-radius:50%; background:rgba(251, 191, 36, 0.08); border:1px solid rgba(251, 191, 36, 0.25); display:flex; align-items:center; justify-content:center; margin-bottom:1.25rem; box-shadow:0 0 35px rgba(251, 191, 36, 0.15);">
+            <i class="fa-solid fa-scale-balanced" style="font-size:2.5rem; color:var(--accent-gold);"></i>
+          </div>
+          <div style="font-size:1.25rem; font-weight:800; color:#ffffff; margin-bottom:0.5rem;">金策品目を選択してください</div>
+          <div style="font-size:0.85rem; color:#94a3b8; max-width:380px; line-height:1.6;">左側の金策カードをクリックすると仕入れ先と販売先の2窓比較が表示されます</div>
+        </div>
+      `;
+    }
+
+    function resetPcMonitorToNoData() {
+      pcMonitorItemId = null;
+      pcMonitorItemName = null;
+      pcMonitorIconUrl = null;
+      pcMonitorWorldName = null;
+
+      document.querySelectorAll('.active-card').forEach(el => el.classList.remove('active-card'));
+      resetPcAnalyticsMonitorToDefault();
+      resetPcArbitrageMonitorToDefault();
+    }
+
+    let currentListingsScope = 'world'; // 'world' | 'dc' | 'all'
+    let pcHistoryHqOnly = false;
+    let pcListingsHqOnly = false;
+
+    function getDcNameForWorld(worldName) {
+      for (const [dc, worlds] of Object.entries(dcWorldsMap || {})) {
+        if (worlds.includes(worldName)) return dc;
+      }
+      return 'Mana';
+    }
+
+    function setListingsScope(scope) {
+      currentListingsScope = scope;
+      ['world', 'dc', 'all'].forEach(s => {
+        const btn = document.getElementById('btnScope_' + s);
+        if (btn) {
+          btn.style.background = s === scope ? 'var(--accent-blue)' : 'transparent';
+          btn.style.color = s === scope ? '#ffffff' : '#94a3b8';
+        }
+      });
+      const scopeTitle = document.getElementById('pcListingsScopeTitle');
+      if (scopeTitle && pcMonitorWorldName) {
+        const dcName = getDcNameForWorld(pcMonitorWorldName);
+        scopeTitle.innerText = scope === 'world' ? `(${pcMonitorWorldName})` : (scope === 'dc' ? `(${dcName} DC)` : `(全DC / 日本)`);
+      }
+      renderListingsTableForScope(pcMonitorWorldName, scope);
+    }
+
+    function togglePcHistoryHqOnly() {
+      pcHistoryHqOnly = !pcHistoryHqOnly;
+      const btn = document.getElementById('btnHistoryHqOnly');
+      if (btn) {
+        btn.style.background = pcHistoryHqOnly ? 'rgba(234, 179, 8, 0.25)' : 'rgba(255,255,255,0.08)';
+        btn.style.borderColor = pcHistoryHqOnly ? 'rgba(234, 179, 8, 0.6)' : 'rgba(255,255,255,0.15)';
+        btn.style.color = pcHistoryHqOnly ? 'var(--accent-gold)' : 'var(--text-muted)';
+      }
+      if (pcMonitorWorldName && pcMonitorItemId) {
+        renderPcMonitorHistory(pcMonitorWorldName, pcMonitorItemId);
+      }
+    }
+
+    // 出品中データ・3指標カードのメモリキャッシュ
+    const activeListingsCache = {};
+    let lastCachedItemId = null;
+
+    function set3MinCardsLoadingState() {
+      const selPEl = document.getElementById('pcListingsSelWorldMinPrice');
+      const dcPEl = document.getElementById('pcListingsDcMinPrice');
+      const allPEl = document.getElementById('pcListingsAllWorldMinPrice');
+      if (selPEl) selPEl.innerText = '-G';
+      if (dcPEl) dcPEl.innerText = '-G';
+      if (allPEl) allPEl.innerText = '-G';
+    }
+
+    function togglePcListingsHqOnly() {
+      pcListingsHqOnly = !pcListingsHqOnly;
+      const btn = document.getElementById('btnListingsHqOnly');
+      if (btn) {
+        btn.style.background = pcListingsHqOnly ? 'rgba(234, 179, 8, 0.25)' : 'rgba(255,255,255,0.08)';
+        btn.style.borderColor = pcListingsHqOnly ? 'rgba(234, 179, 8, 0.6)' : 'rgba(255,255,255,0.15)';
+        btn.style.color = pcListingsHqOnly ? 'var(--accent-gold)' : 'var(--text-muted)';
+      }
+      if (pcMonitorWorldName && pcMonitorItemId) {
+        prefetchAndRenderAllActiveScopes(pcMonitorWorldName, pcMonitorItemId, true);
+      }
+    }
+
+    // 3スコープ最安カード値の適用ヘルパー
+    function applySummaryCardValues(worldName, dcName, selP, dcP, dcW, globalP, globalW) {
+      const selWNameEl = document.getElementById('pcListingsSelWorldName');
+      const selPEl = document.getElementById('pcListingsSelWorldMinPrice');
+      const dcWNameEl = document.getElementById('pcListingsDcMinName');
+      const dcPEl = document.getElementById('pcListingsDcMinPrice');
+      const allWNameEl = document.getElementById('pcListingsAllWorldMinName');
+      const allPEl = document.getElementById('pcListingsAllWorldMinPrice');
+
+      if (selWNameEl) selWNameEl.innerText = worldName;
+      if (selPEl) selPEl.innerText = selP > 0 ? `${selP.toLocaleString()}G` : '-G';
+
+      if (dcWNameEl) dcWNameEl.innerText = dcW !== '-' ? `${dcW} (${dcName})` : `${dcName} DC`;
+      if (dcPEl) dcPEl.innerText = dcP > 0 ? `${dcP.toLocaleString()}G` : '-G';
+
+      if (allWNameEl) allWNameEl.innerText = globalW !== '-' ? `${globalW} (${getDcNameForWorld(globalW)})` : '全32ワールド';
+      if (allPEl) allPEl.innerText = globalP > 0 ? `${globalP.toLocaleString()}G` : '-G';
+    }
+
+    // 出品一覧テーブル描画ヘルパー (自鯖ハイライト付き & 0ms即時描画)
+    function renderListingsTableForScope(targetWorld, currentScope) {
+      const tbody = document.getElementById('pcActiveListingsTbody');
+      const thead = document.getElementById('pcActiveListingsThead');
+      const countBadge = document.getElementById('pcListingsCountBadge');
+      if (!tbody) return;
+
+      if (thead) {
+        thead.innerHTML = `
+          <tr>
+            <th>ワールド</th>
+            <th>リテイナー</th>
+            <th>品質</th>
+            <th>単価 (G)</th>
+            <th>数量</th>
+            <th>合計金額 (G)</th>
+          </tr>
+        `;
+      }
+
+      const cacheKey = `${pcMonitorItemId}_${targetWorld}_${currentScope}_${pcListingsHqOnly ? 'hq' : 'all'}`;
+      const cached = activeListingsCache[cacheKey];
+
+      if (!cached) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> 出品データを取得中...</td></tr>`;
+        return;
+      }
+
+      if (countBadge) {
+        countBadge.innerText = `${cached.listings.length}件 (${(cached.unitsForSale || 0).toLocaleString()}個)`;
+      }
+
+      if (cached.listings.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-muted);">${pcListingsHqOnly ? 'HQ品の' : ''}現在出品中の商品はありません</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = cached.listings.slice(0, 100).map(l => {
+        const price = (l.pricePerUnit || 0).toLocaleString();
+        const qty = (l.quantity || 0).toLocaleString();
+        const total = ((l.pricePerUnit || 0) * (l.quantity || 0)).toLocaleString();
+        const hqBadge = l.hq ? `<span class="hq-badge">HQ</span>` : `<span style="color:var(--text-muted); font-size:0.75rem;">NQ</span>`;
+        const retainer = l.retainerName ? escapeHtml(l.retainerName) : '-';
+        const itemWorld = l.worldName || targetWorld;
+        const isHome = itemWorld === targetWorld;
+        const rowBg = isHome ? 'background: rgba(0, 210, 255, 0.08); border-left: 3px solid var(--accent-blue);' : '';
+        const worldLabel = isHome
+          ? `<span style="color:var(--accent-blue); font-weight:800;">${itemWorld} <span style="font-size:0.6rem; padding:1px 3px; border-radius:3px; background:rgba(0,210,255,0.2); border:1px solid rgba(0,210,255,0.5);">自鯖</span></span>`
+          : `<span style="color:var(--accent-gold);">${itemWorld}</span>`;
+
+        return `
+          <tr style="${rowBg}">
+            <td style="font-size:0.72rem; font-weight:700; white-space:nowrap; padding:4px 6px;">${worldLabel}</td>
+            <td style="font-size:0.75rem; font-weight:600; color:var(--accent-blue); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:90px; padding:4px 6px;" title="${retainer}">${retainer}</td>
+            <td style="padding:4px 6px;">${hqBadge}</td>
+            <td style="font-weight:700; color:var(--accent-green); padding:4px 6px;">${price}G</td>
+            <td style="font-weight:600; padding:4px 6px;">${qty}個</td>
+            <td style="font-weight:700; color:#ffb703; padding:4px 6px;">${total}G</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ⚡ 集約 Universalis API 取得 (7リクエスト ➔ 1リクエストに統合し、レートリミットを完全根絶)
+    async function prefetchAndRenderAllActiveScopes(worldName, itemId, forceRefresh = false) {
+      if (worldName) pcMonitorWorldName = worldName;
+      if (itemId) pcMonitorItemId = itemId;
+      const targetWorld = pcMonitorWorldName;
+      const targetItem = pcMonitorItemId;
+      if (!targetWorld || !targetItem) return;
+
+      const dcName = getDcNameForWorld(targetWorld);
+      const sameDcWorlds = dcWorldsMap[dcName] || [targetWorld];
+      const hqParam = pcListingsHqOnly ? '&hq=true' : '';
+      const hqSuffix = pcListingsHqOnly ? 'hq' : 'all';
+
+      if (lastCachedItemId !== targetItem || forceRefresh) {
+        for (const k in activeListingsCache) delete activeListingsCache[k];
+        lastCachedItemId = targetItem;
+      }
+
+      set3MinCardsLoadingState();
+
+      // ボタン＆タイトル同期
+      ['world', 'dc', 'all'].forEach(s => {
+        const btn = document.getElementById('btnScope_' + s);
+        if (btn) {
+          btn.style.background = s === currentListingsScope ? 'var(--accent-blue)' : 'transparent';
+          btn.style.color = s === currentListingsScope ? '#ffffff' : '#94a3b8';
+        }
+      });
+      const scopeTitle = document.getElementById('pcListingsScopeTitle');
+      if (scopeTitle) {
+        scopeTitle.innerText = currentListingsScope === 'world' ? `(${targetWorld})` : (currentListingsScope === 'dc' ? `(${dcName} DC)` : `(全DC / 日本)`);
+      }
+
+      const summaryCacheKey = `3min_${targetItem}_${targetWorld}_${hqSuffix}`;
+      if (!forceRefresh && activeListingsCache[summaryCacheKey]) {
+        const c = activeListingsCache[summaryCacheKey];
+        applySummaryCardValues(targetWorld, dcName, c.selMinPrice, c.dcMinPrice, c.dcMinWorld, c.globalMinPrice, c.globalMinWorld);
+        renderListingsTableForScope(targetWorld, currentListingsScope);
+        return;
+      }
+
+      const tbody = document.getElementById('pcActiveListingsTbody');
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> 出品データを取得中...</td></tr>`;
+      }
+
+      // 自鯖専用 (world) と 全日本DC (Japan) を2並行取得 (他鯖の出品で自鯖が押し出される欠損を完全根絶)
+      const urlWorld = `https://universalis.app/api/v2/${encodeURIComponent(targetWorld)}/${targetItem}?listings=50${hqParam}`;
+      const urlJapan = `https://universalis.app/api/v2/Japan/${targetItem}?listings=100${hqParam}`;
+
+      try {
+        const [resWorld, resJapan] = await Promise.all([
+          fetchWithTimeout(urlWorld, { timeout: 12000 }).catch(() => null),
+          fetchWithTimeout(urlJapan, { timeout: 12000 }).catch(() => null)
+        ]);
+
+        if ((!resWorld || !resWorld.ok) && (!resJapan || !resJapan.ok)) {
+          throw new Error('Universalis API Error');
+        }
+
+        let worldData = (resWorld && resWorld.ok) ? await resWorld.json() : null;
+        let japanData = (resJapan && resJapan.ok) ? await resJapan.json() : null;
+
+        let worldListings = worldData ? (worldData.listings || []) : [];
+        let allListings = japanData ? (japanData.listings || []) : [];
+
+        // 自鯖エンドポイントの出品には worldName が省略されるため明示補完
+        worldListings.forEach(l => { if (!l.worldName) l.worldName = targetWorld; });
+
+        if (pcListingsHqOnly) {
+          worldListings = worldListings.filter(l => Boolean(l.hq));
+          allListings = allListings.filter(l => Boolean(l.hq));
+        } else {
+          worldListings = worldListings.filter(l => !Boolean(l.hq));
+          allListings = allListings.filter(l => !Boolean(l.hq));
+        }
+
+        const dcListings = allListings.filter(l => sameDcWorlds.includes(l.worldName));
+
+        // 3大最安値を算出
+        const selMinListing = worldListings[0];
+        const selMinPrice = selMinListing ? (selMinListing.pricePerUnit || 0) : 0;
+
+        const dcMinListing = dcListings[0] || selMinListing;
+        const dcMinPrice = dcMinListing ? (dcMinListing.pricePerUnit || 0) : 0;
+        const dcMinWorld = dcMinListing ? (dcMinListing.worldName || dcName) : '-';
+
+        const globalMinListing = allListings[0] || dcMinListing || selMinListing;
+        const globalMinPrice = globalMinListing ? (globalMinListing.pricePerUnit || 0) : 0;
+        const globalMinWorld = globalMinListing ? (globalMinListing.worldName || '-') : '-';
+
+        activeListingsCache[summaryCacheKey] = { selMinPrice, dcMinPrice, dcMinWorld, globalMinPrice, globalMinWorld };
+        activeListingsCache[`${targetItem}_${targetWorld}_all_${hqSuffix}`] = { listings: allListings, unitsForSale: (japanData && japanData.unitsForSale) || allListings.length };
+        activeListingsCache[`${targetItem}_${targetWorld}_dc_${hqSuffix}`] = { listings: dcListings, unitsForSale: dcListings.reduce((sum, l) => sum + (l.quantity || 0), 0) };
+        activeListingsCache[`${targetItem}_${targetWorld}_world_${hqSuffix}`] = { listings: worldListings, unitsForSale: (worldData && worldData.unitsForSale) || worldListings.length };
+
+        applySummaryCardValues(targetWorld, dcName, selMinPrice, dcMinPrice, dcMinWorld, globalMinPrice, globalMinWorld);
+        renderListingsTableForScope(targetWorld, currentListingsScope);
+
+      } catch (err) {
+        console.error("fetchItemActiveListingsUnified error:", err);
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:1.5rem; color:#ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> 出品データ取得失敗 (再試行してください)</td></tr>`;
+        }
+      }
+    }
+
+    // 互換性エイリアス
+    const fetchAndRender3MinSummaryCards = prefetchAndRenderAllActiveScopes;
+    const fetchAndRenderActiveListings = (w, id, s, f) => {
+      if (s) currentListingsScope = s;
+      prefetchAndRenderAllActiveScopes(w || pcMonitorWorldName, id || pcMonitorItemId, f);
+    };
+
+    function renderPcAnalyticsMonitorPane(itemId, itemName, iconUrl, worldName, isHq = false) {
+      const wrapper = document.getElementById('analyticsMonitorWrapper');
+      if (!wrapper) return;
+
+      const lodestoneUrl = `https://jp.finalfantasyxiv.com/lodestone/playguide/db/item/?patch=&db_search_category=item&category2=&q=${encodeURIComponent(itemName)}`;
+
+      wrapper.innerHTML = `
+        <!-- 1. 【共通ヘッダーカード枠】 -->
+        <div id="pcAnalyticsCommonHeader" class="pc-common-header" style="display:flex; align-items:center; justify-content:space-between; padding:0.75rem 1rem; background:rgba(22, 30, 49, 0.95); border:1px solid var(--card-border); border-radius:14px; margin-bottom:0.75rem; flex-shrink:0; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+          <div style="display:flex; align-items:center; gap:0.75rem;">
+            <img id="pcMonitorIcon" src="${iconUrl}" alt="" loading="lazy" decoding="async" style="width:44px; height:44px; border-radius:10px; border:1px solid var(--card-border); background:#0b111e; object-fit:cover;">
+            <div>
+              <div style="font-size:1.2rem; font-weight:800; color:#ffffff; line-height:1.2; display:flex; align-items:center; gap:8px;" id="pcMonitorTitle">
+                <span>${itemName}</span>
+                ${isHq ? '<span style="font-size:0.72rem; font-weight:900; color:var(--accent-gold); background:rgba(255,183,3,0.18); border:1px solid rgba(255,183,3,0.5); padding:2px 6px; border-radius:6px;">HQ</span>' : '<span style="font-size:0.72rem; font-weight:700; color:#94a3b8; background:rgba(148,163,184,0.12); border:1px solid rgba(148,163,184,0.3); padding:2px 6px; border-radius:6px;">NQ</span>'}
+              </div>
+              <div style="font-size:0.75rem; color:var(--text-muted); display:flex; align-items:center; gap:0.7rem; margin-top:3px;" id="pcMonitorMeta">
+                ID: ${itemId} | 選択中ワールド: ${worldName}
+              </div>
+            </div>
+          </div>
+
+          <a id="pcMonitorLodestone" href="${lodestoneUrl}" target="_blank" rel="noopener" class="lodestone-link-icon" style="font-size:0.82rem; padding:6px 12px; border-radius:8px; background:rgba(0, 210, 255, 0.12); border:1px solid rgba(0, 210, 255, 0.3); color:var(--accent-blue); font-weight:700; text-decoration:none;" title="Lodestoneで開く">
+            Lodestone <i class="fa-solid fa-arrow-up-right-from-square" style="margin-left:3px;"></i>
+          </a>
+        </div>
+
+        <!-- 2. 【下部 2分割独立ウィンドウペインエリア】 (左: 取引・推移 / 右: 出品状況) -->
+        <div class="pc-analytics-split-pane" style="display:grid; grid-template-columns: 1fr 1fr; gap:0.85rem; flex:1; min-height:0; overflow:hidden;">
+          <!-- 👈 独立ウィンドウ 1: 取引・推移ペイン (#pcAnalyticsHistoryPane) -->
+          <div id="pcAnalyticsHistoryPane" class="pc-detail-pane" style="display:flex; flex-direction:column; min-height:0; overflow:hidden; gap:0.75rem; background:rgba(22, 30, 49, 0.95); border:1px solid var(--card-border); border-radius:14px; padding:0.85rem; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+            <!-- 1. 3指標ハイライト比較カード枠 (最安/平均/最高) -->
+            <div class="dc-summary-grid" style="grid-template-columns: repeat(3, 1fr); flex-shrink:0;">
+              <div class="dc-summary-card min-card" id="pcMonitorMinCard">
+                <div>
+                  <div class="dc-summary-label"><i class="fa-solid fa-tag" style="color:var(--accent-green);"></i> 最安値 (${worldName})</div>
+                  <div class="dc-summary-world" id="pcMonitorMinWorld">${worldName}</div>
+                </div>
+                <div class="dc-summary-price" id="pcMonitorMinPrice">-G</div>
+              </div>
+
+              <div class="dc-summary-card min-avg-card" id="pcMonitorAvgCard">
+                <div>
+                  <div class="dc-summary-label"><i class="fa-solid fa-scale-balanced" style="color:#c084fc;"></i> 平均値 (${worldName})</div>
+                  <div class="dc-summary-world" id="pcMonitorAvgWorld">${worldName}</div>
+                </div>
+                <div class="dc-summary-price" id="pcMonitorAvgPrice">-G</div>
+              </div>
+
+              <div class="dc-summary-card max-card" id="pcMonitorMaxCard">
+                <div>
+                  <div class="dc-summary-label"><i class="fa-solid fa-arrow-trend-up" style="color:#ef4444;"></i> 最高値 (${worldName})</div>
+                  <div class="dc-summary-world" id="pcMonitorMaxWorld">${worldName}</div>
+                </div>
+                <div class="dc-summary-price" id="pcMonitorMaxPrice">-G</div>
+              </div>
+            </div>
+
+            <!-- 2. 日別加重平均価格・販売量推移 グラフエリア -->
+            <div style="background:rgba(15, 23, 42, 0.7); border:1px solid var(--card-border); border-radius:12px; padding:0.65rem 0.85rem; flex-shrink:0;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.4rem;">
+                <div style="font-size:0.82rem; font-weight:800; color:#ffffff; display:flex; align-items:center; gap:0.4rem;">
+                  <i class="fa-solid fa-chart-line" style="color:var(--accent-green);"></i> 販売量・金額推移 (${worldName})
+                </div>
+                <span id="pcMonitorTrendBadge" style="color:#94a3b8; font-size:0.75rem;">-</span>
+              </div>
+              <div style="width:100%; position:relative;">
+                <canvas id="pcMonitorCanvas" style="width:100%; height:105px; display:block;"></canvas>
+                <div id="pcMonitorTrendSummary" style="display:flex; justify-content:space-between; gap:2px; margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.06);"></div>
+              </div>
+            </div>
+
+            <!-- 3. 直近の売買取引履歴テーブル (6列) -->
+            <div style="flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden;">
+              <div style="font-size:0.82rem; font-weight:800; color:#ffffff; margin-bottom:0.4rem; flex-shrink:0; display:flex; align-items:center; justify-content:space-between;">
+                <div style="display:flex; align-items:center; gap:0.4rem;">
+                  <i class="fa-solid fa-receipt" style="color:var(--accent-blue);"></i> 直近の売買取引履歴一覧 (${worldName})
+                </div>
+              </div>
+              <div class="history-table-container" style="flex:1; min-height:0; max-height:none !important; overflow-y:auto; border-radius:10px;">
+                <table class="history-table" style="font-size:0.7rem;">
+                  <thead>
+                    <tr>
+                      <th>取引日時 (JST)</th>
+                      <th>購入者</th>
+                      <th>品質</th>
+                      <th>単価 (G)</th>
+                      <th>数量</th>
+                      <th>合計金額 (G)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pcMonitorHistoryTbody">
+                    <tr>
+                      <td colspan="6" style="text-align:center; padding:1.5rem; color:var(--text-muted);">
+                        データ読込中...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 👉 独立ウィンドウ 2: 出品状況ペイン (#pcAnalyticsListingsPane) -->
+          <div id="pcAnalyticsListingsPane" class="pc-detail-pane" style="display:flex; flex-direction:column; min-height:0; overflow:hidden; gap:0.75rem; background:rgba(22, 30, 49, 0.95); border:1px solid var(--card-border); border-radius:14px; padding:0.85rem; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+            <!-- 出品側 3指標ハイライトカード枠 (左カラムの4指標カードとコンテナ構造・天面高さ・サイズを100%完全同一化) -->
+            <div class="dc-summary-grid" style="grid-template-columns:repeat(3, 1fr); flex-shrink:0;">
+              <div class="dc-summary-card min-card" id="pcListingsSelWorldMinCard">
+                <div>
+                  <div class="dc-summary-label"><i class="fa-solid fa-tag" style="color:var(--accent-green);"></i> 選択サーバー最安</div>
+                  <div class="dc-summary-world" id="pcListingsSelWorldName">${worldName}</div>
+                </div>
+                <div class="dc-summary-price" id="pcListingsSelWorldMinPrice">-G</div>
+              </div>
+
+              <div class="dc-summary-card min-avg-card" id="pcListingsDcMinCard">
+                <div>
+                  <div class="dc-summary-label"><i class="fa-solid fa-layer-group" style="color:#38bdf8;"></i> 同DC最安</div>
+                  <div class="dc-summary-world" id="pcListingsDcMinName">-</div>
+                </div>
+                <div class="dc-summary-price" id="pcListingsDcMinPrice">-G</div>
+              </div>
+
+              <div class="dc-summary-card max-avg-card" id="pcListingsAllWorldMinCard">
+                <div>
+                  <div class="dc-summary-label"><i class="fa-solid fa-trophy" style="color:var(--accent-gold);"></i> 全DC最安</div>
+                  <div class="dc-summary-world" id="pcListingsAllWorldMinName">-</div>
+                </div>
+                <div class="dc-summary-price" id="pcListingsAllWorldMinPrice">-G</div>
+              </div>
+            </div>
+
+            <!-- 下部コンテナ: セクションタイトル ＋ コントロール群 ＋ 出品一覧テーブル -->
+            <div style="flex:1; display:flex; flex-direction:column; background:rgba(15, 23, 42, 0.65); border:1px solid var(--card-border); border-radius:12px; padding:0.75rem; min-height:0; overflow:hidden;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem; padding-bottom:0.4rem; border-bottom:1px solid rgba(255,255,255,0.06); flex-shrink:0;">
+                <div style="font-size:0.82rem; font-weight:800; color:var(--accent-gold); display:flex; align-items:center; gap:0.4rem;">
+                  <i class="fa-solid fa-store"></i> 出品中の商品 <span id="pcListingsScopeTitle" style="font-size:0.72rem; color:#94a3b8; font-weight:normal;">(${worldName})</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:0.4rem;">
+                  <!-- 3モード切替タブ (単一 / 同DC / 全DC) -->
+                  <div style="display:inline-flex; background:rgba(0,0,0,0.4); border:1px solid var(--card-border); border-radius:6px; padding:2px; gap:2px;">
+                    <button onclick="setListingsScope('world')" id="btnScope_world" class="listings-scope-btn" style="padding:2px 6px; font-size:0.68rem; font-weight:700; border-radius:4px; border:none; cursor:pointer; background:var(--accent-blue); color:#ffffff;">単一</button>
+                    <button onclick="setListingsScope('dc')" id="btnScope_dc" class="listings-scope-btn" style="padding:2px 6px; font-size:0.68rem; font-weight:700; border-radius:4px; border:none; cursor:pointer; background:transparent; color:#94a3b8;">同DC</button>
+                    <button onclick="setListingsScope('all')" id="btnScope_all" class="listings-scope-btn" style="padding:2px 6px; font-size:0.68rem; font-weight:700; border-radius:4px; border:none; cursor:pointer; background:transparent; color:#94a3b8;">全DC</button>
+                  </div>
+
+                  <span id="pcListingsCountBadge" style="font-size:0.7rem; color:var(--text-muted); font-weight:600;">-</span>
+                  <button onclick="prefetchAndRenderAllActiveScopes(null, null, true)" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:var(--text-muted); padding:2px 7px; border-radius:6px; font-size:0.7rem; cursor:pointer;" title="最新情報に更新">
+                    <i class="fa-solid fa-rotate-right"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 出品一覧テーブル -->
+              <div class="history-table-container" style="flex:1; min-height:0; max-height:none !important; overflow-y:auto; border-radius:10px;">
+                <table class="history-table" style="font-size:0.7rem;">
+                  <thead id="pcActiveListingsThead">
+                    <tr>
+                      <th>ワールド</th>
+                      <th>リテイナー</th>
+                      <th>品質</th>
+                      <th>単価 (G)</th>
+                      <th>数量</th>
+                      <th>合計金額 (G)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pcActiveListingsTbody">
+                    <tr>
+                      <td colspan="6" style="text-align:center; padding:2rem; color:var(--text-muted);">
+                        <i class="fa-solid fa-spinner fa-spin"></i> 出品データを取得中...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      computePcMonitorDcMinMaxSummary(itemId, worldName, isHq);
+      renderPcMonitorHistory(worldName, itemId, isHq);
+      prefetchAndRenderAllActiveScopes(worldName, itemId);
+    }
+
+    function selectPcMonitorItem(itemId, itemName, iconUrl, worldName, isHq = false) {
+      if (!itemName && pcMonitorItemName) {
+        itemName = pcMonitorItemName;
+      }
+      pcMonitorItemId = itemId;
+      if (itemName) pcMonitorItemName = itemName;
+      if (iconUrl) pcMonitorIconUrl = iconUrl;
+      pcMonitorWorldName = worldName;
+      pcMonitorIsHq = isHq;
+      pcListingsHqOnly = isHq;
+      pcHistoryHqOnly = isHq;
+
+      // 左側カード列のハイライト枠を追従同期更新＆表示領域外の場合はオートスクロール調整
+      const allCards = document.querySelectorAll('.item-card');
+      let activeCardEl = null;
+      allCards.forEach(c => {
+        const cId = c.getAttribute('data-item_id');
+        const cHq = c.getAttribute('data-hq') === '1';
+        if (cId == String(itemId) && cHq === isHq) {
+          c.classList.add('active-card');
+          activeCardEl = c;
+        } else {
+          c.classList.remove('active-card');
+        }
+      });
+
+      if (activeCardEl) {
+        requestAnimationFrame(() => {
+          activeCardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      }
+
+      renderPcAnalyticsMonitorPane(itemId, itemName, iconUrl, worldName, isHq);
+    }
+
+    function computePcMonitorDcMinMaxSummary(itemId, worldName, isHq = false) {
+      const selectedWorldItems = (allData && worldName && allData[worldName]) ? allData[worldName] : [];
+      const selItem = selectedWorldItems.find(x => x.item_id === itemId && Boolean(x.hq) === isHq);
+
+      const minWEl = document.getElementById('pcMonitorMinWorld');
+      const minPEl = document.getElementById('pcMonitorMinPrice');
+      const avgWEl = document.getElementById('pcMonitorAvgWorld');
+      const avgPEl = document.getElementById('pcMonitorAvgPrice');
+      const maxWEl = document.getElementById('pcMonitorMaxWorld');
+      const maxPEl = document.getElementById('pcMonitorMaxPrice');
+
+      if (minWEl) minWEl.innerText = worldName || '-';
+      if (minPEl) minPEl.innerText = (selItem && selItem.min_price > 0) ? selItem.min_price.toLocaleString() + 'G' : '-G';
+
+      if (avgWEl) avgWEl.innerText = worldName || '-';
+      if (avgPEl) avgPEl.innerText = (selItem && selItem.avg_price > 0) ? Math.round(selItem.avg_price).toLocaleString() + 'G' : '-G';
+
+      if (maxWEl) maxWEl.innerText = worldName || '-';
+      if (maxPEl) maxPEl.innerText = (selItem && selItem.max_price > 0) ? selItem.max_price.toLocaleString() + 'G' : '-G';
+
+      // リージョン全32ワールド横断で「最安平均ワールド」を計算
+      let minAvgVal = Infinity;
+      let minAvgWorldStr = '-';
+      let minAvgWName = null;
+
+      for (const [dc, worlds] of Object.entries(dcWorldsMap || {})) {
+        for (const w of worlds) {
+          const items = allData[w] || [];
+          const found = items.find(x => x.item_id === itemId && Boolean(x.hq) === isHq);
+          if (found && found.avg_price > 0 && found.avg_price < minAvgVal) {
+            minAvgVal = found.avg_price;
+            minAvgWorldStr = w + ' (' + dc + ')';
+            minAvgWName = w;
+          }
+        }
+      }
+
+      const minAvgWEl = document.getElementById('pcMonitorMinAvgWorld');
+      const minAvgPEl = document.getElementById('pcMonitorMinAvgPrice');
+
+      if (minAvgWEl) minAvgWEl.innerText = minAvgWorldStr !== '-' ? minAvgWorldStr : 'データなし';
+      if (minAvgPEl) minAvgPEl.innerText = minAvgVal !== Infinity ? Math.round(minAvgVal).toLocaleString() + 'G' : '-G';
+
+      // 出品側 3指標カードの計算・反映 (選択中ワールド最安 / 全サーバー最安 / 全サーバー平均)
+      const selWorldMinEl = document.getElementById('pcListingsSelWorldMinPrice');
+      const allWorldMinEl = document.getElementById('pcListingsAllWorldMinPrice');
+      const allWorldAvgEl = document.getElementById('pcListingsAllWorldAvgPrice');
+
+      if (selWorldMinEl) {
+        selWorldMinEl.innerText = (selItem && selItem.min_price > 0) ? selItem.min_price.toLocaleString() + 'G' : '-G';
+      }
+
+      let globalMinVal = Infinity;
+      let globalMinWorld = '-';
+      let totalAvgSum = 0;
+      let avgWorldCount = 0;
+
+      for (const [dc, worlds] of Object.entries(dcWorldsMap || {})) {
+        for (const w of worlds) {
+          const items = allData[w] || [];
+          const found = items.find(x => x.item_id === itemId);
+          if (found) {
+            if (found.min_price > 0 && found.min_price < globalMinVal) {
+              globalMinVal = found.min_price;
+              globalMinWorld = w;
+            }
+            if (found.avg_price > 0) {
+              totalAvgSum += found.avg_price;
+              avgWorldCount++;
+            }
+          }
+        }
+      }
+
+      if (allWorldMinEl) {
+        allWorldMinEl.innerText = (globalMinVal !== Infinity) ? `${globalMinWorld}: ${globalMinVal.toLocaleString()}G` : '-G';
+      }
+
+      if (allWorldAvgEl) {
+        const globalAvg = avgWorldCount > 0 ? (totalAvgSum / avgWorldCount) : 0;
+        allWorldAvgEl.innerText = (globalAvg > 0) ? `${Math.round(globalAvg).toLocaleString()}G` : '-G';
+      }
+
+      fetchAndRender3MinSummaryCards(worldName, itemId);
+      const minAvgCardEl = document.getElementById('pcMonitorMinAvgCard');
+      if (minAvgCardEl) {
+        if (minAvgWName && minAvgWName !== '-') {
+          minAvgCardEl.classList.add('clickable-card');
+          minAvgCardEl.onclick = () => switchPcWorld(minAvgWName);
+          minAvgCardEl.title = 'クリックで ' + minAvgWName + ' ワールドに切り替え';
+        } else {
+          minAvgCardEl.classList.remove('clickable-card');
+          minAvgCardEl.onclick = null;
+          minAvgCardEl.title = '';
+        }
+      }
+    }
+
+    function renderPcMonitorHistory(worldName, itemId) {
+      const worldItems = allData[worldName] || [];
+      const item = worldItems.find(x => x.item_id === itemId && Boolean(x.hq) === Boolean(pcMonitorIsHq)) || worldItems.find(x => x.item_id === itemId);
+      const weekRange = getWeekRangeJst();
+      let history = (item && item.history) ? item.history.filter(h => !h.ts || h.ts >= weekRange.startTs) : [];
+      const { trend, trendPct } = getOrComputeDailyTrend(item);
+
+      const badgeEl = document.getElementById('pcMonitorTrendBadge');
+      if (badgeEl) {
+        badgeEl.innerHTML = buildTrendBadgeHtml(trendPct, { fontSize: '0.82rem', title: '7日推移', labelSuffix: (trendPct > 0 ? '(値上がり)' : (trendPct < 0 ? '(値下がり)' : '(安定相場)')) });
+      }
+
+      drawTrendChart('pcMonitorCanvas', 'pcMonitorTrendSummary', trend, trendPct, {
+        defaultWidth: 680, height: 120, paddingTop: 15, paddingBottom: 25,
+        summaryMinW: '50px', summaryDateFontSize: '0.68rem', summaryValFontSize: '0.72rem', summaryVolFontSize: '0.62rem',
+        drawGrid: true, maxBarW: 16, barHFactor: 0.6, lineWidth: 2.2, dotRadius: 3, dateYOffset: 8, dateFontSize: '10px'
+      });
+
+      const tbody = document.getElementById('pcMonitorHistoryTbody');
+      if (!tbody) return;
+
+      if (pcHistoryHqOnly) {
+        history = history.filter(h => Boolean(h.hq));
+      } else {
+        history = history.filter(h => !Boolean(h.hq));
+      }
+
+      if (!history || history.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:1.5rem; color:var(--text-muted);">${pcHistoryHqOnly ? 'HQ品の' : 'NQ品の'}取引履歴データがありません</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = history.map(buildHistoryRowHtml).join('');
+    }
+    let currentModalWorld = null;
+
+
+
+
+
+
+
+    
+
+    function buildTrendBadgeHtml(trendPct, options = {}) {
+      const fontSize = options.fontSize || '0.65rem';
+      const titleAttr = options.title ? `title="${options.title}"` : '';
+      const suffix = options.labelSuffix ? ` ${options.labelSuffix}` : '';
+      if (trendPct > 0) {
+        return `<span style="color:#4ade80; font-weight:700; font-size:${fontSize};" ${titleAttr}><i class="fa-solid fa-arrow-trend-up"></i> +${trendPct}%${suffix}</span>`;
+      } else if (trendPct < 0) {
+        return `<span style="color:#f87171; font-weight:700; font-size:${fontSize};" ${titleAttr}><i class="fa-solid fa-arrow-trend-down"></i> ${trendPct}%${suffix}</span>`;
+      }
+      return `<span style="color:#94a3b8; font-size:${fontSize};" ${titleAttr}>➡️ 0%${suffix}</span>`;
+    }
+
+    function buildHistoryRowHtml(h) {
+      const formattedTime = formatTimeLocal(new Date(h.ts * 1000).toISOString());
+      const buyerName = h.buyer ? escapeHtml(h.buyer) : `<span style="color:var(--text-muted); font-size:0.75rem;">-</span>`;
+      const hqBadge = h.hq ? `<span class="hq-badge">HQ</span>` : `<span style="color:var(--text-muted); font-size:0.75rem;">NQ</span>`;
+      const price = (h.price || 0).toLocaleString();
+      const qty = (h.qty || 0).toLocaleString();
+      const totalPrice = ((h.price || 0) * (h.qty || 0)).toLocaleString();
+
+      return `
+        <tr>
+          <td style="font-size:0.75rem; color:var(--text-muted);"><i class="fa-regular fa-clock"></i> ${formattedTime}</td>
+          <td style="font-size:0.75rem; font-weight:600; color:var(--accent-blue);">${buyerName}</td>
+          <td>${hqBadge}</td>
+          <td style="font-weight:700; color:var(--accent-green);">${price}G</td>
+          <td>${qty}個</td>
+          <td style="font-weight:700; color:#ffb703;">${totalPrice}G</td>
+        </tr>
+      `;
+    }
+
+    function generateSparklineSvg(item, width = 64, height = 18) {
+      const { trend, trendPct } = getOrComputeDailyTrend(item);
+      if (!trend || trend.length < 2) return '';
+      const validPoints = trend.map(d => d.weighted_avg || 0);
+      const nonZero = validPoints.filter(p => p > 0);
+      if (nonZero.length < 2) return '';
+
+      const minP = Math.min(...nonZero);
+      const maxP = Math.max(...nonZero);
+      const range = (maxP - minP) || 1;
+
+      const coords = validPoints.map((p, idx) => {
+        const x = (idx / (validPoints.length - 1)) * (width - 6) + 3;
+        const val = p > 0 ? p : minP;
+        const y = height - 3 - (((val - minP) / range) * (height - 6));
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      });
+
+      const isUp = (trendPct >= 0);
+      const color = isUp ? '#4ade80' : '#f87171';
+
+      return `
+        <svg width="${width}" height="${height}" style="vertical-align:middle; overflow:visible;">
+          <polyline fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" points="${coords.join(' ')}" />
+        </svg>
+      `;
+    }
+
+
+
+
+
+    function switchMainViewMode(mode) {
+      activeMainViewMode = mode;
+      pcMonitorItemId = null;
+      pcMonitorItemName = null;
+      pcMonitorIconUrl = null;
+      pcMonitorWorldName = null;
+
+      const btnAna = document.getElementById('modeBtnAnalytics');
+      const btnArb = document.getElementById('modeBtnArbitrage');
+
+
+      if (btnAna) btnAna.classList.toggle('active', mode === 'analytics');
+      if (btnArb) btnArb.classList.toggle('active', mode === 'arbitrage');
+
+
+      const dashboard = document.getElementById('pcDashboardContainer');
+      if (dashboard) {
+        if (mode === 'analytics') {
+          dashboard.classList.add('view-analytics');
+          dashboard.classList.remove('view-arbitrage');
+        } else {
+          dashboard.classList.add('view-arbitrage');
+          dashboard.classList.remove('view-analytics');
+        }
+      }
+
+      const analyticsWrapper = document.getElementById('analyticsGridWrapper');
+      const arbWrapper = document.getElementById('arbitrageGridWrapper');
+      const arbSection = document.getElementById('arbitrageSection');
+
+      // カードのアクティブハイライト枠クリア＆スクロール位置リセット
+      document.querySelectorAll('.active-card').forEach(el => el.classList.remove('active-card'));
+      const leftPane = document.querySelector('.left-card-scroll-pane');
+      if (leftPane) leftPane.scrollTop = 0;
+      const arbCardGrid = document.querySelector('#arbitrageCardGrid');
+      if (arbCardGrid) arbCardGrid.scrollTop = 0;
+
+      // 両モニター枠をデフォルト初期状態に戻す
+      resetPcAnalyticsMonitorToDefault();
+      resetPcArbitrageMonitorToDefault();
+
+      if (mode === 'analytics') {
+        if (analyticsWrapper) analyticsWrapper.style.display = 'flex';
+        if (arbWrapper) arbWrapper.style.display = 'none';
+        if (arbSection) arbSection.style.display = 'none';
+        renderWorldGrid();
+      } else {
+        if (analyticsWrapper) analyticsWrapper.style.display = 'none';
+        if (arbWrapper) arbWrapper.style.display = 'flex';
+        if (arbSection) arbSection.style.display = 'none';
+        populateArbitrageHomeWorldSelect();
+        renderArbitrageGrid();
+      }
+    }
+
+    function populateArbitrageHomeWorldSelect() {
+      const select = document.getElementById('arbHomeWorldSelect');
+
+      const savedHomeWorld = currentModalWorld || getSavedUserHomeWorld() || 'Chocobo';
+
+      let html = '';
+      for (const [dc, worlds] of Object.entries(dcWorldsMap || {})) {
+        html += `<optgroup label="[ ${dc} DC ]">`;
+        for (const w of worlds) {
+          const isSelected = (w === savedHomeWorld) ? 'selected' : '';
+          html += `<option value="${w}" ${isSelected}>${dc} - ${w}</option>`;
+        }
+        html += `</optgroup>`;
+      }
+
+      if (select) {
+        if (select.children.length === 0) {
+          select.innerHTML = html;
+        }
+        if (!select.dataset.listenerBound) {
+          select.dataset.listenerBound = "true";
+          select.addEventListener('change', (e) => {
+            if (e.target.value) {
+              saveUserHomeWorld(e.target.value);
+              renderArbitrageGrid();
+            }
+          });
+        }
+      }
+    }
+
+
+
+    let currentArbSortMode = 'unitProfit';
+    let currentArbMinVel = 0;
+
+    function setArbSort(mode) {
+      currentArbSortMode = mode;
+      resetPcMonitorToNoData();
+      renderArbitrageGrid();
+
+      const itemList = document.querySelector('#arbitrageCardGrid');
+      if (itemList) itemList.scrollTop = 0;
+    }
+
+    function handleArbCardClick(itemId, itemTitle, itemIcon, sourceWorld, homeWorld, categoryName, unitProfit, roiPercent, isHq = false) {
+      selectPcArbitrageItem(itemId, itemTitle, itemIcon, sourceWorld, homeWorld, categoryName, unitProfit, roiPercent, isHq);
+    }
+
+    function selectPcArbitrageItem(itemId, itemTitle, itemIcon, sourceWorld, homeWorld, categoryName, unitProfit, roiPercent, isHq = false) {
+      pcMonitorItemId = itemId;
+      pcMonitorItemName = itemTitle;
+      pcMonitorIconUrl = itemIcon;
+      pcMonitorWorldName = homeWorld;
+      pcArbSelectedIsHq = isHq;
+
+      // Always reset source (仕入れ) and home (販売) view modes to 'history' (取引履歴) when switching items
+      pcArbSourceViewMode = 'history';
+      pcArbHomeViewMode = 'history';
+
+      // 左側カード列のハイライト枠同期＆スクロール追従
+      const allCards = document.querySelectorAll('#arbitrageCardGrid .arbitrage-card');
+      let activeCardEl = null;
+      allCards.forEach(c => {
+        if (c.getAttribute('data-item_id') == String(itemId)) {
+          c.classList.add('active-card');
+          activeCardEl = c;
+        } else {
+          c.classList.remove('active-card');
+        }
+      });
+
+      if (activeCardEl) {
+        requestAnimationFrame(() => {
+          activeCardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      }
+
+      renderPcArbitrageMonitorPane(itemId, itemTitle, itemIcon, sourceWorld, homeWorld, categoryName, unitProfit, roiPercent, isHq);
+    }
+
+    let pcArbSourceViewMode = 'history';
+    let pcArbHomeViewMode = 'history';
+
+    let pcArbSelectedSourceWorld = null;
+    let pcArbSelectedHomeWorld = null;
+    let pcArbSelectedCatName = null;
+    let pcArbSelectedUnitProfit = 0;
+    let pcArbSelectedRoi = 0;
+
+    function setArbSourceViewMode(mode) {
+      pcArbSourceViewMode = mode;
+      if (pcMonitorItemId) {
+        renderPcArbitrageMonitorPane(pcMonitorItemId, pcMonitorItemName, pcMonitorIconUrl, pcArbSelectedSourceWorld, pcArbSelectedHomeWorld, pcArbSelectedCatName, pcArbSelectedUnitProfit, pcArbSelectedRoi, pcArbSelectedIsHq);
+      }
+    }
+
+    function setArbHomeViewMode(mode) {
+      pcArbHomeViewMode = mode;
+      if (pcMonitorItemId) {
+        renderPcArbitrageMonitorPane(pcMonitorItemId, pcMonitorItemName, pcMonitorIconUrl, pcArbSelectedSourceWorld, pcArbSelectedHomeWorld, pcArbSelectedCatName, pcArbSelectedUnitProfit, pcArbSelectedRoi, pcArbSelectedIsHq);
+      }
+    }
+
+    async function fetchAndRenderArbListings(containerId, worldOrRegion, itemId, hqOnly, isSource = false, targetPrice = 0) {
+      const tbody = document.getElementById(containerId);
+      if (!tbody || !itemId) return;
+
+      const hqSuffix = hqOnly ? 'hq' : 'all';
+      const cacheKey = `arb_${worldOrRegion}_${itemId}_${hqSuffix}`;
+      const colCount = targetPrice > 0 ? 7 : 6;
+
+      const renderRows = (listings) => {
+        if (!listings || listings.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center; padding:1.5rem; color:var(--text-muted);">${hqOnly ? 'HQ品の' : ''}現在出品中の商品はありません</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = listings.slice(0, 50).map(l => {
+          const p = (l.pricePerUnit || 0);
+          const price = p.toLocaleString();
+          const qty = (l.quantity || 0).toLocaleString();
+          const total = (p * (l.quantity || 0)).toLocaleString();
+          const hqBadge = l.hq ? `<span class="hq-badge">HQ</span>` : `<span style="color:var(--text-muted); font-size:0.75rem;">NQ</span>`;
+          const retainer = l.retainerName ? escapeHtml(l.retainerName) : '-';
+          const wName = l.worldName || worldOrRegion;
+
+          let badgeTd = '';
+          let rowStyle = '';
+          let priceColor = 'var(--accent-green)';
+
+          if (targetPrice > 0) {
+            const diffPct = Math.round(((p - targetPrice) / targetPrice) * 100);
+            const diffPctStr = diffPct > 0 ? `+${diffPct}%` : `${diffPct}%`;
+
+            if (isSource) {
+              // 【仕入れエリア】: 割安 (<= 0%) vs 割高 (> 0%)
+              if (p <= targetPrice) {
+                badgeTd = `<td><span style="background:rgba(74, 222, 128, 0.18); color:#4ade80; border:1px solid rgba(74, 222, 128, 0.4); padding:1px 5px; border-radius:4px; font-size:0.64rem; font-weight:700; white-space:nowrap;"><i class="fa-solid fa-circle-check"></i> 割安 (${diffPctStr})</span></td>`;
+                priceColor = '#4ade80';
+                rowStyle = 'background: rgba(74, 222, 128, 0.05);';
+              } else {
+                badgeTd = `<td><span style="background:rgba(248, 113, 113, 0.15); color:#f87171; border:1px solid rgba(248, 113, 113, 0.35); padding:1px 5px; border-radius:4px; font-size:0.64rem; font-weight:700; white-space:nowrap;"><i class="fa-solid fa-circle-xmark"></i> 割高 (${diffPctStr})</span></td>`;
+                priceColor = '#f87171';
+              }
+            } else {
+              // 【販売エリア】: 高値 (> +5%) / 適正 (-5% ~ +5%) / 安値 (< -5%)
+              if (diffPct > 5) {
+                badgeTd = `<td><span style="background:rgba(255, 183, 3, 0.18); color:#ffb703; border:1px solid rgba(255, 183, 3, 0.4); padding:1px 5px; border-radius:4px; font-size:0.64rem; font-weight:700; white-space:nowrap;"><i class="fa-solid fa-arrow-trend-up"></i> 高値 (${diffPctStr})</span></td>`;
+                priceColor = '#ffb703';
+              } else if (diffPct >= -5) {
+                badgeTd = `<td><span style="background:rgba(56, 189, 248, 0.15); color:#38bdf8; border:1px solid rgba(56, 189, 248, 0.35); padding:1px 5px; border-radius:4px; font-size:0.64rem; font-weight:700; white-space:nowrap;"><i class="fa-solid fa-scale-balanced"></i> 適正 (${diffPctStr})</span></td>`;
+                priceColor = '#38bdf8';
+              } else {
+                badgeTd = `<td><span style="background:rgba(244, 114, 182, 0.15); color:#f472b6; border:1px solid rgba(244, 114, 182, 0.35); padding:1px 5px; border-radius:4px; font-size:0.64rem; font-weight:700; white-space:nowrap;"><i class="fa-solid fa-arrow-trend-down"></i> 安値 (${diffPctStr})</span></td>`;
+                priceColor = '#f472b6';
+              }
+            }
+          }
+
+          return `
+            <tr style="${rowStyle}">
+              <td style="font-size:0.68rem; font-weight:700; color:var(--accent-gold); white-space:nowrap;">${wName}</td>
+              <td style="font-size:0.68rem; font-weight:600; color:var(--accent-blue); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:90px;" title="${retainer}">${retainer}</td>
+              <td>${hqBadge}</td>
+              <td style="font-weight:700; color:${priceColor};">${price}G</td>
+              ${badgeTd}
+              <td style="font-weight:600;">${qty}個</td>
+              <td style="font-weight:700; color:#ffb703;">${total}G</td>
+            </tr>
+          `;
+        }).join('');
+      };
+
+      // 1. メモリキャッシュ（金策キャッシュまたは市場モジュール共有キャッシュ）から0ms即時描画
+      const sharedCacheKey = worldOrRegion === 'Japan' 
+        ? `${itemId}_${currentModalWorld || 'Japan'}_all_${hqSuffix}`
+        : `${itemId}_${worldOrRegion}_world_${hqSuffix}`;
+
+      const cachedData = activeListingsCache[cacheKey] || activeListingsCache[sharedCacheKey];
+      if (cachedData && cachedData.listings) {
+        let listings = cachedData.listings;
+        if (hqOnly) listings = listings.filter(l => Boolean(l.hq));
+        renderRows(listings);
+        return;
+      }
+
+      tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center; padding:1.5rem; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> 出品データを取得中...</td></tr>`;
+
+      try {
+        let apiUrl = `https://universalis.app/api/v2/${encodeURIComponent(worldOrRegion)}/${itemId}?listings=100`;
+        if (hqOnly) apiUrl += '&hq=true';
+
+        // 2. インフライト制御（同一URLへの多重通信を1本に統合）
+        if (!inFlightFetchMap.has(apiUrl)) {
+          const fetchPromise = (async () => {
+            let res = await fetchWithTimeout(apiUrl, { timeout: 12000 });
+            if (!res || !res.ok) {
+              await new Promise(r => setTimeout(r, 600));
+              res = await fetchWithTimeout(apiUrl, { timeout: 12000 });
+            }
+            if (!res || !res.ok) throw new Error('API Error');
+            return await res.json();
+          })().finally(() => {
+            inFlightFetchMap.delete(apiUrl);
+          });
+          inFlightFetchMap.set(apiUrl, fetchPromise);
+        }
+
+        const data = await inFlightFetchMap.get(apiUrl);
+        let listings = (data && data.listings) ? data.listings : [];
+        if (hqOnly) listings = listings.filter(l => Boolean(l.hq));
+
+        activeListingsCache[cacheKey] = { listings, unitsForSale: (data && data.unitsForSale) || 0 };
+        renderRows(listings);
+      } catch (err) {
+        console.error('fetchAndRenderArbListings error:', err);
+        tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center; padding:1.5rem; color:#ef4444;">出品データの取得に失敗しました</td></tr>`;
+      }
+    }
+
+function renderPcArbitrageMonitorPane(itemId, itemTitle, itemIcon, sourceWorld, homeWorld, categoryName, unitProfit, roiPercent, isHq = false) {
+      const wrapper = document.getElementById('arbitrageMonitorWrapper');
+      if (!wrapper) return;
+
+      pcArbSelectedSourceWorld = sourceWorld;
+      pcArbSelectedHomeWorld = homeWorld;
+      pcArbSelectedCatName = categoryName;
+      pcArbSelectedUnitProfit = unitProfit;
+      pcArbSelectedRoi = roiPercent;
+      pcArbSelectedIsHq = isHq;
+
+      const sourceItems = allData[sourceWorld] || [];
+      const sourceItem = sourceItems.find(x => (x.item_id || x.id) == itemId && Boolean(x.hq) === Boolean(isHq)) || sourceItems.find(x => (x.item_id || x.id) == itemId);
+      const sourceBuyPrice = sourceItem ? (getRecent3DayAvg(sourceItem) || sourceItem.avg_price || sourceItem.min_price || 0) : 0;
+      const sourceTrendObj = getOrComputeDailyTrend(sourceItem);
+
+      const homeItems = allData[homeWorld] || [];
+      const homeItem = homeItems.find(x => (x.item_id || x.id) == itemId && Boolean(x.hq) === Boolean(isHq)) || homeItems.find(x => (x.item_id || x.id) == itemId);
+      const homeSellPrice = homeItem ? (getRecent3DayAvg(homeItem) || homeItem.avg_price || homeItem.min_price || 0) : 0;
+      const homeTrendObj = getOrComputeDailyTrend(homeItem);
+
+      const lodestoneUrl = `https://jp.finalfantasyxiv.com/lodestone/playguide/db/item/?patch=&db_search_category=item&category2=&q=${encodeURIComponent(itemTitle)}`;
+      const sourceDc = findDcForWorld(sourceWorld) || '';
+      const homeDc = findDcForWorld(homeWorld) || '';
+
+      const sourceBadge = buildTrendBadgeHtml(sourceTrendObj.trendPct, { fontSize: '0.72rem' });
+      const homeBadge = buildTrendBadgeHtml(homeTrendObj.trendPct, { fontSize: '0.72rem' });
+
+      // 過去1週間の基準 (今日を含めた7日間・8/27 00:00:00 JST 以降)
+      const weekRange = getWeekRangeJst();
+
+      // 仕入れ先 (単一ワールド: sourceWorld) 取引履歴データの取得
+      let sourceHistories = [];
+      if (pcArbSourceViewMode === 'history') {
+        sourceHistories = (sourceItem && sourceItem.history) ? sourceItem.history.filter(h => !h.ts || h.ts >= weekRange.startTs) : [];
+      }
+
+      // 販売先 (ホームワールド単一: homeWorld) 取引履歴データの取得
+      let homeHistories = [];
+      if (pcArbHomeViewMode === 'history') {
+        homeHistories = (homeItem && homeItem.history) ? homeItem.history.filter(h => !h.ts || h.ts >= weekRange.startTs) : [];
+      }
+
+      const html = `
+        <!-- 金策2窓モニターヘッダー -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:0.75rem; border-bottom:1px solid var(--card-border); margin-bottom:0.85rem; flex-shrink:0;">
+          <div style="display:flex; align-items:center; gap:0.75rem;">
+            <img src="${itemIcon}" alt="" style="width:48px; height:48px; border-radius:10px; border:1px solid var(--card-border); background:#0b111e; object-fit:cover;">
+            <div>
+              <div style="font-size:1.25rem; font-weight:800; color:#ffffff; line-height:1.2; display:flex; align-items:center; gap:8px;">
+                <span>${itemTitle}</span>
+                ${isHq ? '<span style="font-size:0.72rem; font-weight:900; color:var(--accent-gold); background:rgba(255,183,3,0.18); border:1px solid rgba(255,183,3,0.5); padding:2px 6px; border-radius:6px;">HQ</span>' : '<span style="font-size:0.72rem; font-weight:700; color:#94a3b8; background:rgba(148,163,184,0.12); border:1px solid rgba(148,163,184,0.3); padding:2px 6px; border-radius:6px;">NQ</span>'}
+              </div>
+              <div style="font-size:0.78rem; color:var(--text-muted); display:flex; align-items:center; gap:0.7rem; margin-top:4px;">
+                ID: ${itemId} | カテゴリ: ${categoryName || '一般'}
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:1rem;">
+            <div style="text-align:right;">
+              <div style="font-size:0.65rem; color:#94a3b8;">予想1個純利益 (手数料控除後):</div>
+              <div style="font-size:1.1rem; font-weight:800; color:var(--accent-green);">+${(unitProfit || 0).toLocaleString()}G <span style="font-size:0.72rem; color:var(--accent-gold); font-weight:700;">(+${roiPercent || 0}%)</span></div>
+            </div>
+            <a href="${lodestoneUrl}" target="_blank" rel="noopener" class="lodestone-link-icon" style="font-size:0.85rem; padding:6px 12px; border-radius:8px; background:rgba(0, 210, 255, 0.1); border:1px solid rgba(0, 210, 255, 0.3); color:var(--accent-blue); font-weight:700; text-decoration:none;" title="Lodestoneで開く">
+              Lodestone <i class="fa-solid fa-arrow-up-right-from-square" style="margin-left:3px;"></i>
+            </a>
+          </div>
+        </div>
+
+        <!-- 2窓対比メインエリア (左右50% split) -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.85rem; flex:1; min-height:0; overflow:hidden;">
+          
+          <!-- 👈 左窓: 仕入れ先エリア (仕入れワールド: sourceWorld) -->
+          <div style="display:flex; flex-direction:column; background:rgba(15, 23, 42, 0.7); border:1px solid rgba(74, 222, 128, 0.35); border-radius:12px; padding:0.75rem; min-height:0; overflow:hidden;">
+            <!-- 仕入れ先ヘッダー -->
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem; padding-bottom:0.4rem; border-bottom:1px solid rgba(255,255,255,0.06); flex-shrink:0;">
+              <span style="font-size:0.88rem; color:var(--accent-green); font-weight:800; display:inline-flex; align-items:center; gap:5px;">
+                <i class="fa-solid fa-cart-shopping"></i> 仕入れ先: ${sourceWorld} <span style="font-size:0.72rem; color:#94a3b8; font-weight:normal;">(${sourceDc})</span>
+              </span>
+              <span style="font-size:0.72rem; color:#94a3b8;">目標仕入値: <strong style="color:#c084fc; font-size:0.85rem;">${sourceBuyPrice > 0 ? sourceBuyPrice.toLocaleString() + 'G' : '-'}</strong></span>
+            </div>
+
+            <!-- 仕入れ先 4枚の指標カード -->
+            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-bottom:0.65rem; flex-shrink:0;">
+              <div style="background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); border-left:4px solid var(--accent-green); border-radius:8px; padding:6px 8px;">
+                <div style="font-size:0.62rem; color:#94a3b8; margin-bottom:2px;">最安価格</div>
+                <div style="font-size:0.85rem; font-weight:800; color:var(--accent-green); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${sourceItem && sourceItem.min_price ? sourceItem.min_price.toLocaleString() + 'G' : '-'}</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #c084fc; border-radius:8px; padding:6px 8px;">
+                <div style="font-size:0.62rem; color:#94a3b8; margin-bottom:2px;">目標仕入値 (中央値)</div>
+                <div style="font-size:0.85rem; font-weight:800; color:#c084fc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${sourceBuyPrice > 0 ? sourceBuyPrice.toLocaleString() + 'G' : '-'}</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #38bdf8; border-radius:8px; padding:6px 8px;">
+                <div style="font-size:0.62rem; color:#94a3b8; margin-bottom:2px;">販売速度</div>
+                <div style="font-size:0.85rem; font-weight:800; color:#38bdf8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${sourceItem && sourceItem.sale_velocity ? sourceItem.sale_velocity.toFixed(1) + '個/日' : '-'}</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); border-left:4px solid var(--accent-gold); border-radius:8px; padding:6px 8px;">
+                <div style="font-size:0.62rem; color:#94a3b8; margin-bottom:2px;">7日売買数</div>
+                <div style="font-size:0.85rem; font-weight:800; color:var(--accent-gold); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${sourceItem && sourceItem.sale_trades ? sourceItem.sale_trades.toLocaleString() + '件' : '-'}</div>
+              </div>
+            </div>
+
+            <!-- フル仕様 7日間相場推移グラフコンテナ -->
+            <div style="background:rgba(15, 23, 42, 0.6); border:1px solid var(--card-border); border-radius:10px; padding:0.6rem 0.8rem; margin-bottom:0.6rem; flex-shrink:0;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                <div style="font-size:0.75rem; font-weight:800; color:#ffffff; display:flex; align-items:center; gap:4px;">
+                  <i class="fa-solid fa-chart-line" style="color:var(--accent-green);"></i> 日別相場推移 (直近7日間)
+                </div>
+                ${sourceBadge}
+              </div>
+              <div style="width:100%; position:relative;">
+                <canvas id="pcArbSourceCanvas" style="width:100%; height:105px; display:block;"></canvas>
+                <div id="pcArbSourceSummary" style="display:flex; justify-content:space-between; gap:2px; width:100%; height:38px; margin-top:2px; padding-top:3px; border-top:1px solid rgba(255,255,255,0.06);"></div>
+              </div>
+            </div>
+
+            <!-- 仕入れ先 テーブル表示エリア (切替タブ) -->
+            <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.4rem; flex-shrink:0;">
+                <div class="view-toggle-group">
+                  <button class="view-toggle-btn ${pcArbSourceViewMode === 'history' ? 'active' : ''}" onclick="setArbSourceViewMode('history')">
+                    <i class="fa-solid fa-clock-rotate-left"></i> 取引履歴
+                  </button>
+                  <button class="view-toggle-btn ${pcArbSourceViewMode === 'listings' ? 'active' : ''}" onclick="setArbSourceViewMode('listings')">
+                    <i class="fa-solid fa-list-ul"></i> 出品一覧
+                  </button>
+                </div>
+              </div>
+
+              <div class="history-table-container" style="flex:1; min-height:0; max-height:none !important; overflow-y:auto; border-radius:8px;">
+                <table class="history-table" style="font-size:0.7rem;">
+                  ${pcArbSourceViewMode === 'listings' ? `
+                    <thead>
+                      <tr>
+                        <th>ワールド</th>
+                        <th>リテイナー</th>
+                        <th>品質</th>
+                        <th>単価 (G)</th>
+                        <th>仕入判定</th>
+                        <th>数量</th>
+                        <th>合計 (G)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="pcArbSourceListingsTbody">
+                      <tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> 出品データを取得中...</td></tr>
+                    </tbody>
+                  ` : `
+                    <thead>
+                      <tr>
+                        <th>日時 (JST)</th>
+                        <th>購入者</th>
+                        <th>HQ</th>
+                        <th>単価 (G)</th>
+                        <th>数量</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${sourceHistories.length > 0 ? sourceHistories.slice(0, 50).map(h => {
+                        const buyerName = h.buyer ? escapeHtml(h.buyer) : `<span style="color:var(--text-muted); font-size:0.68rem;">-</span>`;
+                        return `
+                        <tr>
+                          <td style="color:var(--text-muted); font-size:0.68rem;">${formatTimeLocal(new Date(h.ts * 1000).toISOString()).slice(5)}</td>
+                          <td style="font-size:0.68rem; font-weight:600; color:var(--accent-blue); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px;" title="${h.buyer ? escapeHtml(h.buyer) : ''}">${buyerName}</td>
+                          <td>${h.hq ? '<span class="hq-badge">HQ</span>' : '<span style="color:var(--text-muted);">NQ</span>'}</td>
+                          <td style="font-weight:700;">${(h.price || 0).toLocaleString()}G</td>
+                          <td>${(h.qty || 0)}個</td>
+                        </tr>
+                      `;}).join('') : '<tr><td colspan="5" style="text-align:center; padding:1.5rem; color:var(--text-muted);">履歴なし</td></tr>'}
+                    </tbody>
+                  `}
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 👉 右窓: 販売先エリア (ホームワールド単一対象) -->
+          <div style="display:flex; flex-direction:column; background:rgba(15, 23, 42, 0.7); border:1px solid rgba(0, 210, 255, 0.35); border-radius:12px; padding:0.75rem; min-height:0; overflow:hidden;">
+            <!-- 販売先ヘッダー -->
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem; padding-bottom:0.4rem; border-bottom:1px solid rgba(255,255,255,0.06); flex-shrink:0;">
+              <span style="font-size:0.88rem; color:var(--accent-blue); font-weight:800; display:inline-flex; align-items:center; gap:5px;">
+                <i class="fa-solid fa-house"></i> 販売先(ホーム): ${homeWorld} <span style="font-size:0.72rem; color:#94a3b8; font-weight:normal;">(${homeDc})</span>
+              </span>
+              <span style="font-size:0.72rem; color:#94a3b8;">目標販売値: <strong style="color:#ffb703; font-size:0.85rem;">${homeSellPrice > 0 ? homeSellPrice.toLocaleString() + 'G' : '-'}</strong></span>
+            </div>
+
+            <!-- 販売先 4枚の指標カード -->
+            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-bottom:0.65rem; flex-shrink:0;">
+              <div style="background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); border-left:4px solid var(--accent-green); border-radius:8px; padding:6px 8px;">
+                <div style="font-size:0.62rem; color:#94a3b8; margin-bottom:2px;">最安価格</div>
+                <div style="font-size:0.85rem; font-weight:800; color:var(--accent-green); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${homeItem && homeItem.min_price ? homeItem.min_price.toLocaleString() + 'G' : '-'}</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #c084fc; border-radius:8px; padding:6px 8px;">
+                <div style="font-size:0.62rem; color:#94a3b8; margin-bottom:2px;">目標販売値 (中央値)</div>
+                <div style="font-size:0.85rem; font-weight:800; color:#c084fc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${homeSellPrice > 0 ? homeSellPrice.toLocaleString() + 'G' : '-'}</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #38bdf8; border-radius:8px; padding:6px 8px;">
+                <div style="font-size:0.62rem; color:#94a3b8; margin-bottom:2px;">販売速度</div>
+                <div style="font-size:0.85rem; font-weight:800; color:#38bdf8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${homeItem && homeItem.sale_velocity ? homeItem.sale_velocity.toFixed(1) + '個/日' : '-'}</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); border-left:4px solid var(--accent-gold); border-radius:8px; padding:6px 8px;">
+                <div style="font-size:0.62rem; color:#94a3b8; margin-bottom:2px;">7日売買数</div>
+                <div style="font-size:0.85rem; font-weight:800; color:var(--accent-gold); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${homeItem && homeItem.sale_trades ? homeItem.sale_trades.toLocaleString() + '件' : '-'}</div>
+              </div>
+            </div>
+
+            <!-- フル仕様 7日間相場推移グラフコンテナ -->
+            <div style="background:rgba(15, 23, 42, 0.6); border:1px solid var(--card-border); border-radius:10px; padding:0.6rem 0.8rem; margin-bottom:0.6rem; flex-shrink:0;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                <div style="font-size:0.75rem; font-weight:800; color:#ffffff; display:flex; align-items:center; gap:4px;">
+                  <i class="fa-solid fa-chart-line" style="color:var(--accent-blue);"></i> 日別相場推移 (直近7日間)
+                </div>
+                ${homeBadge}
+              </div>
+              <div style="width:100%; position:relative;">
+                <canvas id="pcArbHomeCanvas" style="width:100%; height:105px; display:block;"></canvas>
+                <div id="pcArbHomeSummary" style="display:flex; justify-content:space-between; gap:2px; width:100%; height:38px; margin-top:2px; padding-top:3px; border-top:1px solid rgba(255,255,255,0.06);"></div>
+              </div>
+            </div>
+
+            <!-- 販売先 テーブル表示エリア (切替タブ) -->
+            <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.4rem; flex-shrink:0;">
+                <div class="view-toggle-group">
+                  <button class="view-toggle-btn ${pcArbHomeViewMode === 'history' ? 'active' : ''}" onclick="setArbHomeViewMode('history')">
+                    <i class="fa-solid fa-clock-rotate-left"></i> 取引履歴
+                  </button>
+                  <button class="view-toggle-btn ${pcArbHomeViewMode === 'listings' ? 'active' : ''}" onclick="setArbHomeViewMode('listings')">
+                    <i class="fa-solid fa-list-ul"></i> 出品一覧
+                  </button>
+                </div>
+              </div>
+
+              <div class="history-table-container" style="flex:1; min-height:0; max-height:none !important; overflow-y:auto; border-radius:8px;">
+                <table class="history-table" style="font-size:0.7rem;">
+                  ${pcArbHomeViewMode === 'listings' ? `
+                    <thead>
+                      <tr>
+                        <th>ワールド</th>
+                        <th>リテイナー</th>
+                        <th>品質</th>
+                        <th>単価 (G)</th>
+                        <th>競合判定</th>
+                        <th>数量</th>
+                        <th>合計 (G)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="pcArbHomeListingsTbody">
+                      <tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> 出品データを取得中...</td></tr>
+                    </tbody>
+                  ` : `
+                    <thead>
+                      <tr>
+                        <th>日時 (JST)</th>
+                        <th>購入者</th>
+                        <th>HQ</th>
+                        <th>単価 (G)</th>
+                        <th>数量</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${homeHistories.length > 0 ? homeHistories.slice(0, 50).map(h => {
+                        const buyerName = h.buyer ? escapeHtml(h.buyer) : `<span style="color:var(--text-muted); font-size:0.68rem;">-</span>`;
+                        return `
+                        <tr>
+                          <td style="color:var(--text-muted); font-size:0.68rem;">${formatTimeLocal(new Date(h.ts * 1000).toISOString()).slice(5)}</td>
+                          <td style="font-size:0.68rem; font-weight:600; color:var(--accent-blue); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px;" title="${h.buyer ? escapeHtml(h.buyer) : ''}">${buyerName}</td>
+                          <td>${h.hq ? '<span class="hq-badge">HQ</span>' : '<span style="color:var(--text-muted);">NQ</span>'}</td>
+                          <td style="font-weight:700;">${(h.price || 0).toLocaleString()}G</td>
+                          <td>${(h.qty || 0)}個</td>
+                        </tr>
+                      `;}).join('') : '<tr><td colspan="5" style="text-align:center; padding:1.5rem; color:var(--text-muted);">履歴なし</td></tr>'}
+                    </tbody>
+                  `}
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      `;
+
+      wrapper.innerHTML = html;
+
+      // 両窓の相場推移チャートを描画 (左右の日付を厳密な7日間に100%完全垂直同期)
+      const allDates = getWeekRangeJst().labels;
+      const fillTrend = (tList) => {
+        const tMap = new Map((tList || []).map(d => [d.date, d]));
+        return allDates.map(date => tMap.get(date) || { date, weighted_avg: 0, volume: 0 });
+      };
+      const srcTrend = fillTrend(sourceTrendObj.trend);
+      const homeTrend = fillTrend(homeTrendObj.trend);
+
+      drawTrendChart('pcArbSourceCanvas', 'pcArbSourceSummary', srcTrend, sourceTrendObj.trendPct, { height: 105, paddingTop: 12, paddingBottom: 16 });
+      drawTrendChart('pcArbHomeCanvas', 'pcArbHomeSummary', homeTrend, homeTrendObj.trendPct, { height: 105, paddingTop: 12, paddingBottom: 16 });
+
+      // 出品モードがアクティブな場合は Universalis ライブ出品データを取得描画
+      const targetBuyGuide = sourceBuyPrice;
+      if (pcArbSourceViewMode === 'listings') {
+        fetchAndRenderArbListings('pcArbSourceListingsTbody', 'Japan', itemId, isHq, true, targetBuyGuide);
+      }
+      if (pcArbHomeViewMode === 'listings') {
+        fetchAndRenderArbListings('pcArbHomeListingsTbody', homeWorld, itemId, isHq, false, homeSellPrice);
+      }
+    }
+
+function updateArbitrageFilters() {
+      const homeWorldSelect = document.getElementById('arbHomeWorldSelect');
+      if (homeWorldSelect && homeWorldSelect.value) {
+        saveUserHomeWorld(homeWorldSelect.value);
+        currentModalWorld = homeWorldSelect.value;
+      }
+      renderArbitrageGrid();
+    }
+
+    // 下限ノイズフィルター適用済みの中央値 (Median) 相場計算
+    // 捨て売り (17G, 3000G等) や誤出品を完全除外して、真の実効相場中央値を算出
+    function getRobustMarketPrice(item) {
+      if (!item) return 0;
+      const weekRange = getWeekRangeJst();
+      const rawHistory = (item.history || []).filter(h => !h.ts || h.ts >= weekRange.startTs);
+      const validPrices = rawHistory.map(h => h.price || 0).filter(p => p > 0);
+
+      const benchmark = item.region_median_price || item.avg_price || (validPrices.length > 0 ? validPrices[0] : 0);
+
+      // 下限ノイズフィルター: 基準相場が 20,000G 以上の品目で、相場の 30% 未満の極端な安値(捨て売り・誤出品)を除外
+      let filtered = validPrices;
+      if (benchmark >= 20000 && validPrices.length > 0) {
+        const minCutoff = benchmark * 0.30;
+        const sanePrices = validPrices.filter(p => p >= minCutoff);
+        if (sanePrices.length > 0) {
+          filtered = sanePrices;
+        }
+      }
+
+      if (filtered.length > 0) {
+        filtered.sort((a, b) => a - b);
+        const mid = Math.floor(filtered.length / 2);
+        return (filtered.length % 2 !== 0)
+          ? filtered[mid]
+          : Math.round((filtered[mid - 1] + filtered[mid]) / 2);
+      }
+
+      return item.region_median_price || item.avg_price || item.min_price || 0;
+    }
+
+    function getRecent3DayAvg(item) {
+      return getRobustMarketPrice(item);
+    }
+
+    function renderArbitrageGrid() {
+      const container = document.getElementById('arbitrageCardGrid');
+      if (!container) return;
+
+      if (Object.keys(allData).length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding:3rem; color:var(--text-muted); grid-column:1/-1;">データを読み込み中...</div>`;
+        return;
+      }
+
+      const savedWorld = currentModalWorld || getSavedUserHomeWorld() || 'Chocobo';
+      const homeWorldSelect = document.getElementById('arbHomeWorldSelect');
+      const arbHomeWorld = (homeWorldSelect && homeWorldSelect.value) ? homeWorldSelect.value : savedWorld;
+      currentModalWorld = arbHomeWorld;
+      saveUserHomeWorld(arbHomeWorld);
+
+      // PC表示用ヘッダー動的挿入
+      const arbCol = document.getElementById('arbitrageWorldColumn');
+      if (arbCol) {
+        let optGroups = '';
+        for (const [dcName, wList] of Object.entries(dcWorldsMap || {})) {
+          optGroups += '<optgroup label="' + dcName + ' DC">';
+          for (const w of wList) {
+            const isSel = (w === arbHomeWorld) ? 'selected' : '';
+            optGroups += '<option value="' + w + '" ' + isSel + '>🌐 ' + w + ' (' + dcName + ')</option>';
+          }
+          optGroups += '</optgroup>';
+        }
+        const pcHomeSelectHtml = '<select class="pc-world-select" id="arbHomeWorldSelect" style="flex:1; width:100%; font-size:0.88rem; font-weight:600; padding:6px 8px; border-radius:8px;" onchange="updateArbitrageFilters()">' + optGroups + '</select>';
+
+        const pcArbHeaderHtml = `
+          <div class="left-pane-header">
+            <!-- 1行目: ソート2タブ (利益額/日商額) ＋ 数量フィルタードロップダウン ＋ クリスタルON/OFF -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px;">
+              <div class="sort-toggle-group" style="display: flex; gap: 3px; background: rgba(0,0,0,0.4); padding: 3px; border-radius: 8px; border: 1px solid var(--card-border);">
+                <button class="sort-toggle-btn ${currentArbSortMode === 'unitProfit' ? 'active' : ''}" onclick="setArbSort('unitProfit')" style="padding: 4px 10px; font-size: 0.74rem;">利益額</button>
+                <button class="sort-toggle-btn ${currentArbSortMode === 'dailyProfit' ? 'active' : ''}" onclick="setArbSort('dailyProfit')" style="padding: 4px 10px; font-size: 0.74rem;">日商額</button>
+              </div>
+
+              <!-- 数量フィルター (日当たり売買数) -->
+              <div style="display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 8px; border: 1px solid var(--card-border); flex: 1;">
+                <i class="fa-solid fa-bolt" style="color: var(--accent-blue); font-size: 0.72rem;"></i>
+                <select id="arbMinVelSelect" class="pc-world-select" style="padding: 2px 4px; font-size: 0.74rem; border: none; background: transparent; color: #ffffff; width: 100%; cursor: pointer;" onchange="currentArbMinVel=this.value; updateArbitrageFilters();">
+                  <option value="0" ${currentArbMinVel == 0 ? 'selected' : ''}>制限なし</option>
+                  <option value="1" ${currentArbMinVel == 1 ? 'selected' : ''}>1個/日以上</option>
+                  <option value="5" ${currentArbMinVel == 5 ? 'selected' : ''}>5個/日以上</option>
+                  <option value="10" ${currentArbMinVel == 10 ? 'selected' : ''}>10個/日以上</option>
+                  <option value="20" ${currentArbMinVel == 20 ? 'selected' : ''}>20個/日以上</option>
+                  <option value="50" ${currentArbMinVel == 50 ? 'selected' : ''}>50個/日以上</option>
+                </select>
+              </div>
+
+              <button class="filter-toggle-btn crystal-filter-btn ${excludeCrystals ? 'active' : ''}" id="pcCrystalFilterBtn2" onclick="toggleCrystalFilter()" title="クリスタル類の表示/除外" style="padding: 4px 8px; font-size: 0.74rem; border-radius: 8px; white-space: nowrap;">
+                <i class="fa-solid fa-gem"></i> ${excludeCrystals ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            <!-- 2行目: ホームワールド選択ラベル ＋ ドロップダウン -->
+            <div style="display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 6px;">
+              <span style="font-size: 0.88rem; font-weight: 700; color: #94a3b8; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                <i class="fa-solid fa-house-user" style="color: var(--accent-gold);"></i> ホーム:
+              </span>
+              ${pcHomeSelectHtml}
+            </div>
+            <!-- 3行目: ホームワールド選択直下の全3200品目検索ボックス -->
+            <div style="position: relative; width: 100%;">
+              <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 0.82rem; color: #94a3b8;"></i>
+              <input type="text" id="pcArbitrageSearchInput" class="search-input" value="${pcArbitrageSearchTerm}" placeholder="アイテム検索..." style="width: 100%; padding: 6px 28px 6px 30px; font-size: 0.88rem; font-weight: 600; border-radius: 8px;" oninput="onArbSearchInput(this.value)">
+              ${pcArbitrageSearchTerm ? `<i class="fa-solid fa-xmark" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.88rem; color: #94a3b8; cursor: pointer;" onclick="clearPcArbitrageSearch()"></i>` : ''}
+            </div>
+          </div>
+        `;
+        
+        const existingHeader = arbCol.querySelector('.left-pane-header');
+        if (!existingHeader) {
+          arbCol.insertAdjacentHTML('afterbegin', pcArbHeaderHtml);
+        } else {
+          // すでにヘッダーが存在する場合は input 要素を破棄せず維持 (文字消失・フォーカス外れを100%防止)
+          const clearIcon = existingHeader.querySelector('.fa-xmark');
+          const searchInput = existingHeader.querySelector('#pcArbitrageSearchInput');
+          if (searchInput && searchInput.parentElement) {
+            if (pcArbitrageSearchTerm && !clearIcon) {
+              searchInput.parentElement.insertAdjacentHTML('beforeend', `<i class="fa-solid fa-xmark" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.88rem; color: #94a3b8; cursor: pointer;" onclick="clearPcArbitrageSearch()"></i>`);
+            } else if (!pcArbitrageSearchTerm && clearIcon) {
+              clearIcon.remove();
+            }
+          }
+        }
+      }
+      const arbMinVel = parseFloat(currentArbMinVel || 0);
+      const arbMinRoi = 15;
+
+      const homeItems = allData[arbHomeWorld] || [];
+      const homeDc = findDcForWorld(arbHomeWorld) || '';
+
+      const homeItemMap = new Map();
+      for (const item of homeItems) {
+        if ((item.sale_velocity || 0) >= arbMinVel && (item.sale_trades || 0) > 0) {
+          const itemKey = `${item.item_id}_${item.hq ? 'hq' : 'nq'}`;
+          homeItemMap.set(itemKey, item);
+        }
+      }
+
+      const allowedWorlds = [];
+      for (const worlds of Object.values(dcWorldsMap || {})) {
+        for (const w of worlds) {
+          if (w !== arbHomeWorld) allowedWorlds.push(w);
+        }
+      }
+
+      const opportunities = [];
+
+      // 事前インデックス globalWorldItemMaps を直接使用 (毎回の new Map 31回を完全撤廃し0ms化)
+      const worldItemMaps = globalWorldItemMaps;
+
+      for (const [itemKey, homeItem] of homeItemMap.entries()) {
+        const itemId = homeItem.item_id;
+        if (excludeCrystals && isCrystalItem(homeItem)) continue;
+        if (pcArbitrageSearchTerm) {
+          const title = (homeItem.item_name || '').toLowerCase();
+          if (!title.includes(pcArbitrageSearchTerm) && !String(itemId).includes(pcArbitrageSearchTerm)) continue;
+        }
+
+        let bestOp = null;
+        let maxProfit = -1;
+
+        for (const sourceWorld of allowedWorlds) {
+          const sourceItem = worldItemMaps[sourceWorld].get(itemKey);
+          if (!sourceItem) continue;
+
+          // 直近3日平均相場ベースでリアルタイム比較
+          const buyPrice = getRecent3DayAvg(sourceItem) || sourceItem.avg_price || 0;
+          const sellPrice = getRecent3DayAvg(homeItem) || homeItem.avg_price || 0;
+
+          if (buyPrice <= 0 || sellPrice <= 0) continue;
+
+          const netCost = buyPrice * 1.05;
+          const netReturn = sellPrice * 0.95;
+          const unitProfit = Math.round(netReturn - netCost);
+
+          if (unitProfit <= 0) continue;
+
+          const roiPercent = ((unitProfit / netCost) * 100);
+          if (roiPercent < arbMinRoi) continue;
+
+          // === 堅牢なノイズフィルター (ギル移動・外れ値・虚偽の利益を完全排除) ===
+          // 1. 自鯖に現在出品がある場合、販売想定値が現在最安値(min_price)の2倍を超えていたらノイズとして除外
+          if (homeItem.min_price > 0 && sellPrice > homeItem.min_price * 2.0) continue;
+          // 2. 利益率が500% (5倍) を超える極端な異常値を除外 (ギル移動の典型)
+          if (roiPercent > 500) continue;
+          // 3. 販売想定値が仕入れ値の5倍を超える異常乖離を除外
+          if (sellPrice > buyPrice * 5) continue;
+          // 4. 仕入れが1,000G以下の低額品なのに販売が2万Gを超える店売り悪用を除外
+          if (buyPrice <= 1000 && sellPrice > 20000) continue;
+          // 5. 100万G以上の高額品で、7日間の取引実績が2件以下しかない通常装備・雑貨(ギル移動)を除外
+          if (sellPrice >= 1000000 && ((homeItem.sale_trades || 0) <= 2 || (sourceItem.sale_trades || 0) <= 2)) {
+            const cat = homeItem.category_name || (globalItemsCatalog[itemId]?.category) || '';
+            const isCollectible = ['その他', 'ミニオン', 'マウント', '雑貨'].includes(cat);
+            if (!isCollectible) continue;
+          }
+          // 6. 下限ノイズガード: 基準相場 (全国中央値) が 30,000G 以上の品目で、仕入れ値が全国相場の 35% 未満の極端な安値 (捨て値・誤出品) は除外
+          const refBenchmark = sourceItem.region_median_price || homeItem.region_median_price || 0;
+          if (refBenchmark >= 30000 && buyPrice < refBenchmark * 0.35) continue;
+
+          const dailyExpectedProfit = Math.round(unitProfit * (homeItem.sale_velocity || 0));
+
+          // 各商品で最も純利益が大きい仕入れ元ワールドを選定
+          if (unitProfit > maxProfit) {
+            maxProfit = unitProfit;
+            bestOp = {
+              itemId,
+              homeItem,
+              sourceItem,
+              sourceWorld,
+              sourceDc: findDcForWorld(sourceWorld),
+              buyPrice,
+              sellPrice,
+              netCost,
+              netReturn,
+              unitProfit,
+              roiPercent: Math.round(roiPercent * 10) / 10,
+              dailyExpectedProfit
+            };
+          }
+        }
+
+        if (bestOp) {
+          opportunities.push(bestOp);
+        }
+      }
+
+      // ソート順の適用 (利益額 or 日商額)
+      const effectiveSort = currentArbSortMode;
+      if (effectiveSort === 'dailyProfit') {
+        opportunities.sort((a, b) => b.dailyExpectedProfit - a.dailyExpectedProfit);
+      } else {
+        // unitProfit (利益額)
+        opportunities.sort((a, b) => b.unitProfit - a.unitProfit);
+      }
+
+      if (opportunities.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center; padding:4rem; color:var(--text-muted); grid-column: 1 / -1;">
+            <i class="fa-solid fa-filter-circle-xmark fa-3x" style="color:var(--text-muted); margin-bottom:1rem;"></i><br>
+            条件に合う金策チャンスが見つかりませんでした。<br>
+            <span style="font-size:0.8rem; opacity:0.7;">（最低利益率や売買数、仕入れ範囲の条件を緩めてみてください）</span>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = opportunities.slice(0, 100).map((op, idx) => {
+        const item = op.homeItem;
+        const meta = globalItemsCatalog[op.itemId] || {};
+        let displayTitle = item.item_name || meta.name || `Item #${op.itemId}`;
+        let cleanTitle = escapeHtml(displayTitle).replace(/\s*\[(NQ|HQ)\]\s*$/i, "").trim();
+        const primaryIcon = (item.icon_url && !item.icon_url.includes("021001_hr1")) 
+          ? item.icon_url 
+          : (meta.icon || getComputedIconUrl(op.itemId));
+        const categoryName = item.category_name || meta.category || 'その他';
+        const lodestoneUrl = `https://jp.finalfantasyxiv.com/lodestone/playguide/db/item/?patch=&db_search_category=item&category2=&q=${encodeURIComponent(displayTitle)}`;
+
+        const targetBuyGuide = Math.round(op.buyPrice * 1.05).toLocaleString();
+        const targetSellGuide = op.sellPrice.toLocaleString();
+
+        const isHq = Boolean(item.hq);
+        const sourceItems = allData[op.sourceWorld] || [];
+        const sourceItem = sourceItems.find(x => (x.item_id || x.id) == op.itemId && Boolean(x.hq) === isHq) || item;
+        const sourceTrendObj = getOrComputeDailyTrend(sourceItem);
+        const sourceTrendPct = sourceTrendObj.trendPct;
+        const sourceSparkline = generateSparklineSvg(sourceItem, 44, 12);
+        const sourceBadge = buildTrendBadgeHtml(sourceTrendPct, { fontSize: '0.64rem' });
+
+        const homeItems = allData[arbHomeWorld] || [];
+        const homeItem = homeItems.find(x => (x.item_id || x.id) == op.itemId && Boolean(x.hq) === isHq) || item;
+        const homeTrendObj = getOrComputeDailyTrend(homeItem);
+        const homeTrendPct = homeTrendObj.trendPct;
+        const homeSparkline = generateSparklineSvg(homeItem, 44, 12);
+        const homeBadge = buildTrendBadgeHtml(homeTrendPct, { fontSize: '0.64rem' });
+
+        return `
+          <div class="arbitrage-card" data-item_id="${op.itemId}" onclick="handleArbCardClick(${op.itemId}, '${escapeHtml(cleanTitle).replace(/'/g, "\\'")}', '${primaryIcon}', '${op.sourceWorld}', '${arbHomeWorld}', '${escapeHtml(categoryName).replace(/'/g, "\\'")}', ${op.unitProfit}, ${op.roiPercent}, ${isHq})" title="クリックで右モニターに2窓比較を表示">
+            <div class="arbitrage-card-header">
+              <img class="item-icon" src="${primaryIcon}" alt="" onerror="this.src='https://v2.xivapi.com/api/asset?path=ui/icon/020000/021001_hr1.tex&format=png'">
+              <div class="item-header-text">
+                <div class="item-card-title">
+                  <span class="rank-tag" style="color:var(--accent-gold);">#${idx + 1}</span>
+                  <span style="font-weight:700;">${cleanTitle}</span>
+                  ${isHq ? '<span style="font-size:0.62rem; font-weight:900; color:var(--accent-gold); background:rgba(255,183,3,0.18); border:1px solid rgba(255,183,3,0.5); padding:1px 5px; border-radius:4px; margin-left:2px;">HQ</span>' : '<span style="font-size:0.62rem; font-weight:700; color:#94a3b8; background:rgba(148,163,184,0.12); border:1px solid rgba(148,163,184,0.3); padding:1px 5px; border-radius:4px; margin-left:2px;">NQ</span>'}
+                  <a href="${lodestoneUrl}" target="_blank" rel="noopener" class="lodestone-link-icon" title="Lodestoneで検索" onclick="event.stopPropagation()">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div class="arb-route-grid">
+              <div class="arb-route-box buy-box">
+                <div class="arb-box-lbl"><i class="fa-solid fa-cart-shopping" style="color:var(--accent-green);"></i> 仕入れ先 (目標値)</div>
+                <div class="arb-box-world">${op.sourceDc} - ${op.sourceWorld}</div>
+                <div class="arb-box-price" style="font-size:0.82rem;"><span style="font-size:0.62rem; color:#94a3b8; font-weight:normal;">目標仕入: </span>${op.buyPrice.toLocaleString()} G</div>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.07);">
+                  ${sourceSparkline}
+                  ${sourceBadge}
+                </div>
+              </div>
+              <div class="arb-route-arrow"><i class="fa-solid fa-arrow-right-long"></i></div>
+              <div class="arb-route-box sell-box">
+                <div class="arb-box-lbl"><i class="fa-solid fa-house" style="color:var(--accent-blue);"></i> 販売先 (目標値)</div>
+                <div class="arb-box-world">${homeDc} - ${arbHomeWorld}</div>
+                <div class="arb-box-price" style="font-size:0.82rem;"><span style="font-size:0.62rem; color:#94a3b8; font-weight:normal;">目標販売: </span>${op.sellPrice.toLocaleString()} G</div>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.07);">
+                  ${homeSparkline}
+                  ${homeBadge}
+                </div>
+              </div>
+            </div>
+
+            <div class="arb-profit-summary">
+              <div class="arb-stat-item">
+                <span class="lbl" style="color:#94a3b8; font-size:0.65rem;">1個純利益:</span>
+                <strong style="color:var(--accent-green); font-size:0.78rem;">+${op.unitProfit.toLocaleString()} G</strong>
+                <span style="font-size:0.65rem; color:#4ade80;">(+${op.roiPercent}%)</span>
+              </div>
+              <div class="arb-stat-item">
+                <span class="lbl" style="color:#94a3b8; font-size:0.65rem;">ホーム売買数:</span>
+                <strong style="color:var(--accent-blue); font-size:0.78rem;">${(item.sale_velocity || 0)} 個/日</strong>
+              </div>
+              <div class="arb-stat-item gold-highlight">
+                <span class="lbl" style="color:#fef08a; font-size:0.65rem;">💰 推定日商利益:</span>
+                <strong style="color:#ffb703; font-size:0.76rem; font-weight:700; white-space:nowrap;">+${op.dailyExpectedProfit.toLocaleString()} G/日</strong>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Polling setInterval removed
+  loadData();
+</script>
+</body>
+</html>
