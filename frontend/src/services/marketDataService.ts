@@ -88,9 +88,9 @@ export async function fetchAndPrepareMarketData(): Promise<MarketDataset> {
 
   loadPromise = (async () => {
     try {
-      const dataUrl = `${import.meta.env.BASE_URL}data.json.gz`;
+      const dataUrl = `${import.meta.env.BASE_URL}data.json.gz?_t=${Date.now()}`;
       console.log(`[marketDataService] Fetching ${dataUrl} ...`);
-      const res = await fetch(dataUrl);
+      const res = await fetch(dataUrl, { cache: 'no-cache' });
       if (!res.ok) throw new Error(`HTTP ${res.status} when fetching ${dataUrl}`);
 
       const buf = await res.arrayBuffer();
@@ -168,9 +168,9 @@ export async function fetchAndPrepareListingsData(): Promise<ListingsDataset | n
 
   loadListingsPromise = (async () => {
     try {
-      const dataUrl = `${import.meta.env.BASE_URL}listings.json.gz`;
+      const dataUrl = `${import.meta.env.BASE_URL}listings.json.gz?_t=${Date.now()}`;
       console.log(`[marketDataService] Fetching listings from ${dataUrl} ...`);
-      const res = await fetch(dataUrl);
+      const res = await fetch(dataUrl, { cache: 'no-cache' });
       if (!res.ok) {
         console.warn(`[marketDataService] listings.json.gz returned HTTP ${res.status}. Preloaded listings unavailable.`);
         return null;
