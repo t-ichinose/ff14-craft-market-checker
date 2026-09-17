@@ -3,7 +3,6 @@
  * Universalis v2 REST API への通信とレスポンス正規化を一元管理するモジュール
  */
 
-import { apiHealthManager } from './apiHealthService';
 import { getPreloadedListings } from './marketDataService';
 import { JAPAN_DCS, WORLD_TO_DC } from '../shared/marketConstants';
 
@@ -111,17 +110,7 @@ export async function fetchMarketListings(
   const hqParam = isHq !== undefined ? `&hq=${isHq ? 1 : 0}` : '';
   const url = `${BASE_URL}/${encodeURIComponent(scope)}/${itemId}?listings=${limit}${hqParam}`;
 
-  const t0 = performance.now();
-  let res: Response;
-  try {
-    res = await fetch(url, { signal });
-    apiHealthManager.recordApiCall(url, performance.now() - t0, res.status);
-  } catch (err: any) {
-    if (err?.name !== 'AbortError') {
-      apiHealthManager.recordApiCall(url, performance.now() - t0, 0);
-    }
-    throw err;
-  }
+  const res = await fetch(url, { signal });
 
   if (!res.ok) {
     throw new Error(`Universalis API error: ${res.status}`);
@@ -162,17 +151,7 @@ export async function fetchMarketHistory(
   const { isHq, limit = 50, signal } = options;
   const url = `${BASE_URL}/${encodeURIComponent(scope)}/${itemId}?entries=${limit}`;
 
-  const t0 = performance.now();
-  let res: Response;
-  try {
-    res = await fetch(url, { signal });
-    apiHealthManager.recordApiCall(url, performance.now() - t0, res.status);
-  } catch (err: any) {
-    if (err?.name !== 'AbortError') {
-      apiHealthManager.recordApiCall(url, performance.now() - t0, 0);
-    }
-    throw err;
-  }
+  const res = await fetch(url, { signal });
 
   if (!res.ok) {
     throw new Error(`Universalis API error: ${res.status}`);

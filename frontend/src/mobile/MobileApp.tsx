@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { JAPAN_DCS } from '../constants/japanDcs';
 import { getSavedSharedWorld, saveSharedWorld } from '../shared/marketConstants';
 import { fetchAndPrepareMarketData, type MarketDataset } from '../services/marketDataService';
-import { ApiHealthIndicator } from '../shared/ApiHealthIndicator';
 import { MobileMarketView } from './MobileMarketView';
 import { MobileArbitrageView } from './MobileArbitrageView';
 import { MobileCraftView } from './MobileCraftView';
@@ -127,7 +126,6 @@ export const MobileApp: React.FC<MobileAppProps> = ({ onSwitchToPc }) => {
 
         {/* ワールド選択 ＆ PC切替 */}
         <div className="flex items-center gap-1.5">
-          <ApiHealthIndicator compact />
           <select
             value={selectedWorld}
             onChange={(e) => handleWorldChange(e.target.value)}

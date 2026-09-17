@@ -8,7 +8,6 @@ import { CraftBox } from './boxes/craft/CraftBox';
 
 // 🛠️ 共通設備（モーダル等）
 import { ItemMarketModal } from './shared/ItemMarketModal';
-import { ApiHealthIndicator } from './shared/ApiHealthIndicator';
 import { prefetchRecipes } from './services/recipeDataService';
 import { fetchAndPrepareMarketData, fetchAndPrepareListingsData } from './services/marketDataService';
 
@@ -172,8 +171,6 @@ export const App: React.FC = () => {
             </span>
           </div>
 
-          {/* API Health Monitor Badge */}
-          <ApiHealthIndicator />
 
           {/* Mobile Preview Toggle */}
           <button
