@@ -1,0 +1,112 @@
+name: FF14 Market Listings Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Execution mode (Item count)'
+        required: true
+        default: 'All'
+        type: choice
+        options:
+          - 'All'
+          - '200'
+          - '50'
+      concurrency:
+        description: 'Concurrency (Parallel requests)'
+        required: true
+        default: '6'
+        type: choice
+        options:
+          - '6'
+          - '8'
+          - '4'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: listings-update
+  cancel-in-progress: false
+
+jobs:
+  run-listings-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install httpx
+
+      - name: Restore / Cache SQLite Database
+        uses: actions/cache@v4
+        with:
+          path: data/ff14_craft.db
+          key: ff14-craft-db-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            ff14-craft-db-${{ runner.os }}-
+
+      - name: Run Listings Pipeline
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: |
+          TEST_MODE="${{ inputs.test_mode || 'All' }}"
+          CONCURRENCY="${{ inputs.concurrency || '6' }}"
+          echo "=== Starting Listings Pipeline (Items: $TEST_MODE, Concurrency: $CONCURRENCY) ==="
+          
+          if [ "$TEST_MODE" = "All" ]; then
+            python backend/app/pipeline/listings_pipeline.py --concurrency $CONCURRENCY
+          else
+            python backend/app/pipeline/listings_pipeline.py --sample $TEST_MODE --concurrency $CONCURRENCY
+          fi
+          echo "=== Listings Pipeline Completed ==="
+
+      - name: Check Generated Data Size
+        run: |
+          ls -lh frontend/public/listings.json.gz || true
+
+      - name: Commit and push updated listings
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          COMMIT_MSG="Auto-update market listings (${{ inputs.test_mode || 'Scheduled' }})"
+
+          git add -f frontend/public/listings.json.gz data/listings.json.gz
+
+          if git diff --staged --quiet; then
+            echo "No listings changes to commit."
+            exit 0
+          fi
+
+          echo "📦 Creating listings update commit..."
+          git commit -m "$COMMIT_MSG"
+
+          for i in {1..5}; do
+            echo "=== Syncing and pushing listings (Attempt $i/5) ==="
+            if git pull --rebase origin main; then
+              if git push origin main; then
+                echo "✨ Successfully pushed listings commit!"
+                exit 0
+              fi
+            else
+              echo "Rebase conflict encountered, aborting rebase..."
+              git rebase --abort || true
+            fi
+
+            echo "Push or rebase failed or conflicted with a concurrent push. Retrying in 3 seconds..."
+            sleep 3
+          done
+
+          echo "❌ Failed to push after 5 attempts."
+          exit 1
