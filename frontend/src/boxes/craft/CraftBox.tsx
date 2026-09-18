@@ -8,7 +8,7 @@ import type {
   MarketDataPayload,
   CraftCardItem,
   CraftPlannerViewProps,
-  RecipeTreeItem,
+  SelectedCraftTarget,
 } from './craftTypes';
 
 export type * from './craftTypes';
@@ -16,12 +16,10 @@ export type * from './craftTypes';
 import {
   getJobBadgeStyle,
   resolveFullTreeForScope,
-  isCrystalItem,
   buildMaterialPriceMaps,
   evaluateAllCraftCards,
   searchCraftPlaceholders,
 } from './craftTreeUtils';
-import { ShoppingListPanel } from './ShoppingListPanel';
 import { InteractiveNodeCanvas } from './InteractiveNodeCanvas';
 
 const ITEMS_PER_PAGE = 40;
@@ -30,6 +28,7 @@ const ITEMS_PER_PAGE = 40;
 // In-memory module cache to eliminate reload latency
 let cachedMarketPayload: MarketDataPayload | null = null;
 let cachedCategories: string[] | null = null;
+
 
 export const CraftBox: React.FC<CraftPlannerViewProps> = ({
 
@@ -58,12 +57,10 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
   const [loading, setLoading] = useState<boolean>(() => !getCachedRecipes() || !cachedMarketPayload);
 
   const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
+  const [selectedTargets, setSelectedTargets] = useState<SelectedCraftTarget[]>([]);
   const [displayCount, setDisplayCount] = useState<number>(ITEMS_PER_PAGE);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Shopping List Panel State
-  const [isShoppingListOpen, setIsShoppingListOpen] = useState<boolean>(true);
-  const [craftCount, setCraftCount] = useState<number>(1);
   const [purchasedMap, setPurchasedMap] = useState<Record<number, number>>({});
 
   // Material Quality Customization (NQ / HQ)
@@ -84,12 +81,15 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Reset purchased/quality only when all targets are removed
   useEffect(() => {
-    setCraftCount(1);
-    setPurchasedMap({});
-    setQualityMap({});
-    setSelfSufficientMap({});
-  }, [selectedCardKey]);
+    if (selectedTargets.length === 0) {
+      setPurchasedMap({});
+      setQualityMap({});
+      setSelfSufficientMap({});
+      setSelectedCardKey(null);
+    }
+  }, [selectedTargets.length]);
 
   const handleSetPurchased = useCallback((id: number, amount: number) => {
     setPurchasedMap((prev) => ({
@@ -110,6 +110,39 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
 
   const handleClearPurchased = useCallback(() => {
     setPurchasedMap({});
+  }, []);
+
+  // Multi-target actions
+  const handleUpdateTargetCraftCount = useCallback((cardKey: string, count: number) => {
+    setSelectedTargets((prev) =>
+      prev.map((t) => (t.cardKey === cardKey ? { ...t, craftCount: Math.max(1, count) } : t))
+    );
+  }, []);
+
+  const handleRemoveTarget = useCallback((cardKey: string) => {
+    setSelectedTargets((prev) => prev.filter((t) => t.cardKey !== cardKey));
+  }, []);
+
+  const handleClearAllTargets = useCallback(() => {
+    setSelectedTargets([]);
+    setSelectedCardKey(null);
+  }, []);
+
+  const handleToggleTarget = useCallback((cardKey: string, item: CraftCardItem) => {
+    setSelectedTargets((prev) => {
+      const exists = prev.some((t) => t.cardKey === cardKey);
+      if (exists) {
+        return prev.filter((t) => t.cardKey !== cardKey);
+      } else {
+        return [...prev, { cardKey, item, craftCount: 1 }];
+      }
+    });
+    setSelectedCardKey(cardKey);
+  }, []);
+
+  const handleSelectSoleTarget = useCallback((cardKey: string, item: CraftCardItem) => {
+    setSelectedCardKey(cardKey);
+    setSelectedTargets([{ cardKey, item, craftCount: 1 }]);
   }, []);
 
   const worldToDc = useMemo(() => {
@@ -294,7 +327,7 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
       filtered = filtered.filter(item => item.daily_sales_qty >= minVelocity);
     }
     if (isFilterCategory) {
-      filtered = filtered.filter(item => selectedCategories.includes(item.cat));
+      filtered = filtered.filter(item => catSet.has(item.cat));
     }
 
     const sorted = [...filtered];
@@ -309,58 +342,84 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
     return sorted;
   }, [allEvaluatedCraftItems, searchQuery, selectedCategories, availableCategories, sortBy, minVelocity, recipesMap, marketData, materialPriceMap, allDcPriceMap]);
 
-  // Selected item object (null if unselected or filtered out)
+  // 各ターゲットごとのリアルタイムツリー解決と動的コスト計算
+  const enrichedTargets: SelectedCraftTarget[] = useMemo(() => {
+    if (!recipesMap || !marketData || selectedTargets.length === 0) return [];
+
+    return selectedTargets.map((target) => {
+      const currentItem = processedItems.find((it) => `${it.item_id}_${it.is_hq ? 'hq' : 'nq'}` === target.cardKey) || target.item;
+      const count = target.craftCount || 1;
+
+      const tree = resolveFullTreeForScope(
+        currentItem.item_id,
+        recipesMap,
+        marketData,
+        materialPriceMap,
+        sourcingScope,
+        salesScopeName,
+        targetDc,
+        true,
+        0,
+        1,
+        materialHqPriceMap,
+        qualityMap,
+        selfSufficientMap
+      );
+
+      const totalBatchCost = tree
+        .filter((t) => t.isActive)
+        .reduce((sum, item) => sum + item.cost * item.amount, 0);
+      const yieldAmt = Math.max(1, currentItem.amt || 1);
+      const activeCraftCost = yieldAmt > 1 ? Math.round(totalBatchCost / yieldAmt) : totalBatchCost;
+      const netSellPrice = Math.round(currentItem.sell_price * 0.95);
+      const profit = netSellPrice - activeCraftCost;
+      const profitRate = activeCraftCost > 0 ? Math.round(((profit / activeCraftCost) * 100) * 10) / 10 : 0;
+      const batchCost = activeCraftCost * yieldAmt;
+      const dailyProfit = Math.round(profit * currentItem.daily_sales_qty);
+
+      const enrichedItem: CraftCardItem = {
+        ...currentItem,
+        craft_cost: activeCraftCost,
+        batch_cost: batchCost,
+        profit,
+        profit_rate: profitRate,
+        daily_profit: dailyProfit,
+      };
+
+      return {
+        cardKey: target.cardKey,
+        item: enrichedItem,
+        craftCount: count,
+        tree,
+      };
+    });
+  }, [
+    selectedTargets,
+    processedItems,
+    recipesMap,
+    marketData,
+    materialPriceMap,
+    sourcingScope,
+    salesScopeName,
+    targetDc,
+    materialHqPriceMap,
+    qualityMap,
+    selfSufficientMap,
+  ]);
+
+  // 単一選択用フォールバック
   const selectedItem = useMemo(() => {
-    if (!selectedCardKey) return null;
-    return processedItems.find((it) => `${it.item_id}_${it.is_hq ? 'hq' : 'nq'}` === selectedCardKey) || null;
-  }, [processedItems, selectedCardKey]);
+    if (enrichedTargets.length > 0) {
+      return enrichedTargets[0].item;
+    }
+    return null;
+  }, [enrichedTargets]);
 
   const liveTree = useMemo(() => {
-    if (!recipesMap || !marketData || !selectedItem) return [];
-    return resolveFullTreeForScope(
-      selectedItem.item_id,
-      recipesMap,
-      marketData,
-      materialPriceMap,
-      sourcingScope,
-      salesScopeName,
-      targetDc,
-      true,
-      0,
-      1,
-      materialHqPriceMap,
-      qualityMap,
-      selfSufficientMap
-    );
-  }, [recipesMap, marketData, selectedItem, materialPriceMap, sourcingScope, salesScopeName, targetDc, materialHqPriceMap, qualityMap, selfSufficientMap]);
+    return enrichedTargets.length > 0 ? enrichedTargets[0].tree || [] : [];
+  }, [enrichedTargets]);
 
-  // HQ/NQ切替後の実効製作原価
-  const activeCraftCost = useMemo(() => {
-    if (!liveTree || liveTree.length === 0 || !selectedItem) return selectedItem?.craft_cost || 0;
-    const totalBatchCost = liveTree
-      .filter((t) => t.isActive)
-      .reduce((sum, item) => sum + item.cost * item.amount, 0);
-    const yieldAmt = Math.max(1, selectedItem.amt || 1);
-    return yieldAmt > 1 ? Math.round(totalBatchCost / yieldAmt) : totalBatchCost;
-  }, [liveTree, selectedItem]);
-
-  // HQ/NQ切替後の動的選択中アイテム (原価・利益・利益率・日商をリアルタイム再計算)
-  const activeSelectedItem = useMemo(() => {
-    if (!selectedItem) return null;
-    const netSellPrice = Math.round(selectedItem.sell_price * 0.95);
-    const profit = netSellPrice - activeCraftCost;
-    const profitRate = activeCraftCost > 0 ? Math.round(((profit / activeCraftCost) * 100) * 10) / 10 : 0;
-    const batchCost = activeCraftCost * Math.max(1, selectedItem.amt || 1);
-    const dailyProfit = Math.round(profit * selectedItem.daily_sales_qty);
-    return {
-      ...selectedItem,
-      craft_cost: activeCraftCost,
-      batch_cost: batchCost,
-      profit,
-      profit_rate: profitRate,
-      daily_profit: dailyProfit,
-    };
-  }, [selectedItem, activeCraftCost]);
+  const activeSelectedItem = selectedItem;
 
   // 素材のNQ/HQトグル
   const handleToggleQuality = useCallback((itemId: number) => {
@@ -370,58 +429,12 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
     }));
   }, []);
 
-  // すべてHQに設定
-  const handleSetAllHq = useCallback(() => {
-    if (!liveTree || liveTree.length === 0) return;
-    const newMap: Record<number, 'nq' | 'hq'> = {};
-    function collect(nodes: RecipeTreeItem[]) {
-      for (const n of nodes) {
-        if (n.hasHqOption) {
-          newMap[n.id] = 'hq';
-        }
-        if (n.subs && n.subs.length > 0) {
-          collect(n.subs);
-        }
-      }
-    }
-    collect(liveTree);
-    setQualityMap(newMap);
-  }, [liveTree]);
-
-  // すべてNQに戻す
-  const handleSetAllNq = useCallback(() => {
-    setQualityMap({});
-  }, []);
-
   // 自給自足 (0G) トグル
   const handleToggleSelfSufficient = useCallback((itemId: number) => {
     setSelfSufficientMap((prev) => ({
       ...prev,
       [itemId]: !prev[itemId],
     }));
-  }, []);
-
-  // すべて自給 (0G) に設定（クリスタル以外）
-  const handleSetAllSelfSufficient = useCallback(() => {
-    if (!liveTree || liveTree.length === 0) return;
-    const newMap: Record<number, boolean> = {};
-    function collect(nodes: RecipeTreeItem[]) {
-      for (const n of nodes) {
-        if (!isCrystalItem(n.name)) {
-          newMap[n.id] = true;
-        }
-        if (n.subs && n.subs.length > 0) {
-          collect(n.subs);
-        }
-      }
-    }
-    collect(liveTree);
-    setSelfSufficientMap(newMap);
-  }, [liveTree]);
-
-  // すべて調達（自給解除）に戻す
-  const handleClearSelfSufficient = useCallback(() => {
-    setSelfSufficientMap({});
   }, []);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -713,9 +726,11 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
             ) : (
               visibleItems.map((item, idx) => {
                 const cardKey = `${item.item_id}_${item.is_hq ? 'hq' : 'nq'}`;
-                const isSelected = selectedCardKey === cardKey;
-                // 選択中のカードなら、HQ調整後の activeSelectedItem を使用
-                const displayItem = (isSelected && activeSelectedItem) ? activeSelectedItem : item;
+                const isSelectedInBatch = selectedTargets.some((t) => t.cardKey === cardKey);
+                const batchTarget = selectedTargets.find((t) => t.cardKey === cardKey);
+                const isSelected = isSelectedInBatch || selectedCardKey === cardKey;
+                // 選択中なら、HQ調整・個別ターゲットの item を使用
+                const displayItem = batchTarget?.item || item;
                 const cleanTitle = displayItem.name || `Item #${displayItem.item_id}`;
                 const jobStyle = getJobBadgeStyle(displayItem.job || '', displayItem.is_company);
                 const lodestoneUrl = `https://jp.finalfantasyxiv.com/lodestone/playguide/db/item/?patch=&db_search_category=item&category2=&q=${encodeURIComponent(cleanTitle)}`;
@@ -729,7 +744,7 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
                       if (isSelected && onSelectItemForModal) {
                         onSelectItemForModal(displayItem.item_id, salesScopeName, displayItem.is_hq);
                       } else {
-                        setSelectedCardKey(cardKey);
+                        handleSelectSoleTarget(cardKey, displayItem);
                       }
                     }}
                     title={isSelected ? 'クリックして全32ワールド相場モニターを開く' : undefined}
@@ -743,9 +758,11 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
                         ? {
                             background: isLoss
                               ? 'linear-gradient(135deg, rgba(248, 113, 113, 0.12) 0%, rgba(15, 23, 42, 0.95) 100%)'
+                              : isSelectedInBatch
+                              ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(15, 23, 42, 0.95) 100%)'
                               : 'linear-gradient(135deg, rgba(0, 210, 255, 0.12) 0%, rgba(15, 23, 42, 0.95) 100%)',
-                            border: isLoss ? '1px solid #f87171' : '1px solid #00d2ff',
-                            boxShadow: isLoss ? '0 0 16px rgba(248, 113, 113, 0.45)' : '0 0 16px rgba(0, 210, 255, 0.45)'
+                            border: isLoss ? '1px solid #f87171' : isSelectedInBatch ? '1px solid #f59e0b' : '1px solid #00d2ff',
+                            boxShadow: isLoss ? '0 0 16px rgba(248, 113, 113, 0.45)' : isSelectedInBatch ? '0 0 16px rgba(245, 158, 11, 0.45)' : '0 0 16px rgba(0, 210, 255, 0.45)'
                           }
                         : {
                             background: 'rgba(22, 30, 49, 0.85)',
@@ -827,6 +844,24 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
                           )}
 
                           <div style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                            {/* 複数選択 追加/解除ボタン */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleTarget(cardKey, displayItem);
+                              }}
+                              className={`px-1.5 py-0.5 rounded text-[0.62rem] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                isSelectedInBatch
+                                  ? 'bg-amber-500/25 hover:bg-rose-500/25 text-amber-300 hover:text-rose-300 border border-amber-500/40 hover:border-rose-500/40 shadow-[0_0_6px_rgba(245,158,11,0.2)]'
+                                  : 'bg-white/5 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-white/10 hover:border-cyan-400/40'
+                              }`}
+                              title={isSelectedInBatch ? 'バッチ製作から除外' : 'バッチ製作に追加'}
+                            >
+                              <i className={`fa-solid ${isSelectedInBatch ? 'fa-check text-amber-400' : 'fa-plus text-cyan-400'} text-[0.6rem]`}></i>
+                              <span>{isSelectedInBatch ? (batchTarget && batchTarget.craftCount > 1 ? `選択中(${batchTarget.craftCount})` : '選択中') : '追加'}</span>
+                            </button>
+
                             <span
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -967,203 +1002,210 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
           const effectiveItem = activeSelectedItem || selectedItem;
           const hasCustomHq = Object.values(qualityMap).some((q) => q === 'hq');
           const hasCustomSelfSufficient = Object.values(selfSufficientMap).some(Boolean);
+          const isMultiBatch = enrichedTargets.length > 1;
 
           return (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' }}>
-            {/* Top Bar Banner (Exact 1:1 Matching Market & Arbitrage tabs) */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(22, 30, 49, 0.95)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', marginBottom: '0.75rem', flexShrink: 0, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-              {/* Left: Icon + Title + Meta */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <img
-                  src={effectiveItem.icon || 'https://xivapi.com/i/000000/000000.png'}
-                  alt={effectiveItem.name}
-                  loading="lazy"
-                  decoding="async"
-                  onClick={() => onSelectItemForModal && onSelectItemForModal(effectiveItem.item_id, salesScopeName, effectiveItem.is_hq)}
-                  title="クリックして全32ワールド相場詳細を表示"
-                  style={{ width: '44px', height: '44px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)', background: '#0b111e', objectFit: 'contain', cursor: 'pointer', flexShrink: 0 }}
-                />
-                <div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span
-                      onClick={() => onSelectItemForModal && onSelectItemForModal(effectiveItem.item_id, salesScopeName, effectiveItem.is_hq)}
-                      style={{ cursor: 'pointer' }}
-                      title="クリックして全32ワールド相場詳細を表示"
-                    >
-                      {effectiveItem.name}
-                    </span>
-                    {effectiveItem.is_hq ? (
-                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#ffb703', background: 'rgba(255,183,3,0.18)', border: '1px solid rgba(255,183,3,0.5)', padding: '2px 6px', borderRadius: '6px' }}>
-                        HQ
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', background: 'rgba(148,163,184,0.12)', border: '1px solid rgba(148,163,184,0.3)', padding: '2px 6px', borderRadius: '6px' }}>
-                        NQ
-                      </span>
-                    )}
-                    {hasCustomHq && (
-                      <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#f59e0b', background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.5)', padding: '2px 6px', borderRadius: '6px' }}>
-                        ★一部/全HQ素材
-                      </span>
-                    )}
-                    {hasCustomSelfSufficient && (
-                      <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#10b981', background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.5)', padding: '2px 6px', borderRadius: '6px' }}>
-                        🌱自給素材あり(0G)
-                      </span>
-                    )}
-                    <span
-                      onClick={() => onSelectItemForModal && onSelectItemForModal(effectiveItem.item_id, salesScopeName, effectiveItem.is_hq)}
-                      style={{ color: '#10b981', fontSize: '0.85rem', cursor: 'pointer', opacity: 0.8 }}
-                      title="全32ワールド相場モニターを開く"
-                    >
-                      <i className="fa-solid fa-chart-line"></i>
-                    </span>
-                    <span className={`px-2 py-0.5 rounded border ${getJobBadgeStyle(effectiveItem.job || '', effectiveItem.is_company)}`} style={{ fontSize: '0.65rem', fontWeight: 700 }}>
-                      {effectiveItem.is_company ? '⚓ カンパニークラフト' : `${effectiveItem.job} Lv${effectiveItem.lvl}`}
-                    </span>
+            {isMultiBatch ? (
+              /* Top Bar Banner (複数選択時: バッチ製造サマリー) */
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(22, 30, 49, 0.95)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '14px', marginBottom: '0.75rem', flexShrink: 0, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                {/* Left: Multi-Craft Batch Info */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '10px', border: '1px solid rgba(245,158,11,0.5)', background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <i className="fa-solid fa-layer-group text-amber-400 text-xl"></i>
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.7rem', marginTop: '3px' }}>
-                    <span>IL{effectiveItem.ilvl} · {effectiveItem.cat}</span>
-                    <span style={{ opacity: 0.3 }}>|</span>
-                    <span>出品先: <strong style={{ color: '#10b981' }}>{salesScopeName}</strong></span>
-                    <span style={{ opacity: 0.3 }}>|</span>
-                    <span>仕入れ基準: <strong style={{ color: '#10b981' }}>{sourcingScope === 'all_dc' ? '全DC最安' : sourcingScope === 'dc' ? '自DC最安' : '自ワールド'}</strong></span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right: Metrics + Lodestone Button */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', textAlign: 'right' }}>
                   <div>
-                    <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>日当利益:</div>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffb703', fontFamily: 'Outfit, sans-serif' }}>
-                      {(effectiveItem.daily_profit || 0).toLocaleString()} <span style={{ fontSize: '0.72rem', color: '#ffb703' }}>G/日</span>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>複数品目 同時製作モード</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#ffb703', background: 'rgba(255,183,3,0.18)', border: '1px solid rgba(255,183,3,0.5)', padding: '2px 8px', borderRadius: '6px' }}>
+                        {enrichedTargets.length}品目 選択中
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleClearAllTargets}
+                        className="text-slate-400 hover:text-rose-300 hover:bg-rose-500/20 px-2 py-0.5 rounded text-xs font-bold border border-white/10 hover:border-rose-400/40 transition-all cursor-pointer ml-1"
+                        title="選択した全品目を解除"
+                      >
+                        <i className="fa-solid fa-trash-can text-[0.65rem]"></i> 全解除
+                      </button>
                     </div>
-                  </div>
-                  <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.1)' }}></div>
-                  <div>
-                    <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>単価利益:</div>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: effectiveItem.profit > 0 ? '#4ade80' : '#f87171', fontFamily: 'Outfit, sans-serif' }}>
-                      {effectiveItem.profit > 0 ? '+' : ''}{(effectiveItem.profit || 0).toLocaleString()}G <span style={{ fontSize: '0.75rem', color: effectiveItem.profit > 0 ? '#34d399' : '#f87171' }}>({effectiveItem.profit_rate.toFixed(1)}%)</span>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.7rem', marginTop: '3px' }}>
+                      <span>出品先: <strong style={{ color: '#10b981' }}>{salesScopeName}</strong></span>
+                      <span style={{ opacity: 0.3 }}>|</span>
+                      <span>仕入れ基準: <strong style={{ color: '#10b981' }}>{sourcingScope === 'all_dc' ? '全DC最安' : sourcingScope === 'dc' ? '自DC最安' : '自ワールド'}</strong></span>
                     </div>
                   </div>
                 </div>
 
-                <a
-                  href={`https://jp.finalfantasyxiv.com/lodestone/playguide/db/item/?patch=&db_search_category=item&category2=&q=${encodeURIComponent(effectiveItem.name || '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: '0.82rem', padding: '6px 12px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
-                >
-                  Lodestone <i className="fa-solid fa-arrow-up-right-from-square"></i>
-                </a>
+                {/* Right: Metrics + Fullscreen */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', textAlign: 'right' }}>
+                    <div>
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>合算日当利益:</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffb703', fontFamily: 'Outfit, sans-serif' }}>
+                        {enrichedTargets.reduce((sum, t) => sum + (t.item.daily_profit || 0), 0).toLocaleString()} <span style={{ fontSize: '0.72rem', color: '#ffb703' }}>G/日</span>
+                      </div>
+                    </div>
+                    <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.1)' }}></div>
+                    <div>
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>合算見込み利益:</div>
+                      {(() => {
+                        const totalProfit = enrichedTargets.reduce((sum, t) => sum + (t.item.profit || 0) * t.craftCount, 0);
+                        return (
+                          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: totalProfit > 0 ? '#4ade80' : '#f87171', fontFamily: 'Outfit, sans-serif' }}>
+                            {totalProfit > 0 ? '+' : ''}{totalProfit.toLocaleString()}G
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
 
-                {/* Fullscreen Toggle in Top Bar */}
-                <button
-                  type="button"
-                  onClick={() => setIsFullscreen((prev) => !prev)}
-                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
-                    isFullscreen
-                      ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
-                      : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border-cyan-500/40 hover:border-cyan-400'
-                  }`}
-                  title={isFullscreen ? '全画面表示を解除 (Esc)' : 'ツリーを画面いっぱいに全画面表示'}
-                >
-                  <i className={`fa-solid ${isFullscreen ? 'fa-compress' : 'fa-expand'}`}></i>
-                  <span>{isFullscreen ? '通常表示 (Esc)' : '全画面'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Tree Section Header */}
-            <div className="flex items-center justify-between px-1 shrink-0" style={{ marginBottom: '0.4rem' }}>
-              <div className="flex items-center gap-2">
-                <i className="fa-solid fa-diagram-project text-emerald-400"></i>
-                <h3 className="text-xs font-bold text-slate-200">
-                  クラフト製作マップ（素材カードをクリックで全32ワールド相場・履歴を表示）
-                </h3>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsShoppingListOpen(prev => !prev)}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                    isShoppingListOpen
-                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
-                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200 hover:bg-slate-700'
-                  }`}
-                  title="調達・買い物リストの表示切替"
-                >
-                  <i className="fa-solid fa-cart-shopping"></i>
-                  <span>買い物リスト</span>
-                  <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${isShoppingListOpen ? 'bg-emerald-500/30 text-emerald-200' : 'bg-slate-700 text-slate-300'}`}>
-                    {craftCount > 1 ? `×${craftCount}` : 'ON'}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsFullscreen((prev) => !prev)}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                    isFullscreen
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
-                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-cyan-300 hover:border-cyan-500/50'
-                  }`}
-                  title={isFullscreen ? '通常表示に戻す (Esc)' : '画面いっぱいに全画面表示'}
-                >
-                  <i className={`fa-solid ${isFullscreen ? 'fa-compress' : 'fa-expand'}`}></i>
-                  <span>{isFullscreen ? '全画面解除' : '全画面'}</span>
-                </button>
-
-                <div className="text-[0.7rem] text-slate-400">
-                  完成原価: <strong className="text-emerald-400 font-bold">{effectiveItem.craft_cost.toLocaleString()}G</strong> / 個
-                  {effectiveItem.amt > 1 && (
-                    <span className="text-slate-400 ml-1.5 font-mono">
-                      (1回分総素材費: {effectiveItem.batch_cost.toLocaleString()}G ÷ {effectiveItem.amt}個完成)
-                    </span>
-                  )}
+                  {/* Fullscreen Toggle in Top Bar */}
+                  <button
+                    type="button"
+                    onClick={() => setIsFullscreen((prev) => !prev)}
+                    className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                      isFullscreen
+                        ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                        : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border-cyan-500/40 hover:border-cyan-400'
+                    }`}
+                    title={isFullscreen ? '全画面表示を解除 (Esc)' : 'ツリーを画面いっぱいに全画面表示'}
+                  >
+                    <i className={`fa-solid ${isFullscreen ? 'fa-compress' : 'fa-expand'}`}></i>
+                    <span>{isFullscreen ? '通常表示 (Esc)' : '全画面'}</span>
+                  </button>
                 </div>
               </div>
-            </div>
-
-            <div className="flex-1 w-full min-h-0 flex gap-3 overflow-hidden">
-              <div className="flex-1 h-full min-w-0 min-h-0 overflow-hidden relative">
-                <InteractiveNodeCanvas
-                  selectedItem={effectiveItem}
-                  tree={liveTree}
-                  currentWorld={salesScopeName}
-                  onOpenMarketModal={onSelectItemForModal}
-                  onToggleQuality={handleToggleQuality}
-                  onSetAllHq={handleSetAllHq}
-                  onSetAllNq={handleSetAllNq}
-                  onToggleSelfSufficient={handleToggleSelfSufficient}
-                  onSetAllSelfSufficient={handleSetAllSelfSufficient}
-                  onClearSelfSufficient={handleClearSelfSufficient}
-                  isFullscreen={isFullscreen}
-                  onToggleFullscreen={() => setIsFullscreen((prev) => !prev)}
-                  craftCount={craftCount}
-                />
-              </div>
-              {isShoppingListOpen && (
-                <div className="w-[380px] shrink-0 h-full min-h-0">
-                  <ShoppingListPanel
-                    selectedItem={effectiveItem}
-                    tree={liveTree}
-                    salesWorld={salesScopeName}
-                    craftCount={craftCount}
-                    onChangeCraftCount={setCraftCount}
-                    purchasedMap={purchasedMap}
-                    onSetPurchased={handleSetPurchased}
-                    onToggleFullPurchased={handleToggleFullPurchased}
-                    onClearPurchased={handleClearPurchased}
-                    onOpenMarketModal={onSelectItemForModal}
-                    onToggleQuality={handleToggleQuality}
-                    onToggleSelfSufficient={handleToggleSelfSufficient}
-                    onClose={() => setIsShoppingListOpen(false)}
+            ) : (
+              /* Top Bar Banner (単一品目選択時) */
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(22, 30, 49, 0.95)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', marginBottom: '0.75rem', flexShrink: 0, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                {/* Left: Icon + Title + Meta */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <img
+                    src={effectiveItem.icon || 'https://xivapi.com/i/000000/000000.png'}
+                    alt={effectiveItem.name}
+                    loading="lazy"
+                    decoding="async"
+                    onClick={() => onSelectItemForModal && onSelectItemForModal(effectiveItem.item_id, salesScopeName, effectiveItem.is_hq)}
+                    title="クリックして全32ワールド相場詳細を表示"
+                    style={{ width: '44px', height: '44px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)', background: '#0b111e', objectFit: 'contain', cursor: 'pointer', flexShrink: 0 }}
                   />
+                  <div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span
+                        onClick={() => onSelectItemForModal && onSelectItemForModal(effectiveItem.item_id, salesScopeName, effectiveItem.is_hq)}
+                        style={{ cursor: 'pointer' }}
+                        title="クリックして全32ワールド相場詳細を表示"
+                      >
+                        {effectiveItem.name}
+                      </span>
+                      {effectiveItem.is_hq ? (
+                        <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#ffb703', background: 'rgba(255,183,3,0.18)', border: '1px solid rgba(255,183,3,0.5)', padding: '2px 6px', borderRadius: '6px' }}>
+                          HQ
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', background: 'rgba(148,163,184,0.12)', border: '1px solid rgba(148,163,184,0.3)', padding: '2px 6px', borderRadius: '6px' }}>
+                          NQ
+                        </span>
+                      )}
+                      {hasCustomHq && (
+                        <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#f59e0b', background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.5)', padding: '2px 6px', borderRadius: '6px' }}>
+                          ★一部/全HQ素材
+                        </span>
+                      )}
+                      {hasCustomSelfSufficient && (
+                        <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#10b981', background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.5)', padding: '2px 6px', borderRadius: '6px' }}>
+                          🌱自給素材あり(0G)
+                        </span>
+                      )}
+                      <span
+                        onClick={() => onSelectItemForModal && onSelectItemForModal(effectiveItem.item_id, salesScopeName, effectiveItem.is_hq)}
+                        style={{ color: '#10b981', fontSize: '0.85rem', cursor: 'pointer', opacity: 0.8 }}
+                        title="全32ワールド相場モニターを開く"
+                      >
+                        <i className="fa-solid fa-chart-line"></i>
+                      </span>
+                      <span className={`px-2 py-0.5 rounded border ${getJobBadgeStyle(effectiveItem.job || '', effectiveItem.is_company)}`} style={{ fontSize: '0.65rem', fontWeight: 700 }}>
+                        {effectiveItem.is_company ? '⚓ カンパニークラフト' : `${effectiveItem.job} Lv${effectiveItem.lvl}`}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.7rem', marginTop: '3px' }}>
+                      <span>IL{effectiveItem.ilvl} · {effectiveItem.cat}</span>
+                      <span style={{ opacity: 0.3 }}>|</span>
+                      <span>出品先: <strong style={{ color: '#10b981' }}>{salesScopeName}</strong></span>
+                      <span style={{ opacity: 0.3 }}>|</span>
+                      <span>仕入れ基準: <strong style={{ color: '#10b981' }}>{sourcingScope === 'all_dc' ? '全DC最安' : sourcingScope === 'dc' ? '自DC最安' : '自ワールド'}</strong></span>
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                {/* Right: Metrics + Lodestone Button */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', textAlign: 'right' }}>
+                    <div>
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>日当利益:</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffb703', fontFamily: 'Outfit, sans-serif' }}>
+                        {(effectiveItem.daily_profit || 0).toLocaleString()} <span style={{ fontSize: '0.72rem', color: '#ffb703' }}>G/日</span>
+                      </div>
+                    </div>
+                    <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.1)' }}></div>
+                    <div>
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>単価利益:</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 800, color: effectiveItem.profit > 0 ? '#4ade80' : '#f87171', fontFamily: 'Outfit, sans-serif' }}>
+                        {effectiveItem.profit > 0 ? '+' : ''}{(effectiveItem.profit || 0).toLocaleString()}G <span style={{ fontSize: '0.75rem', color: effectiveItem.profit > 0 ? '#34d399' : '#f87171' }}>({effectiveItem.profit_rate.toFixed(1)}%)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <a
+                    href={`https://jp.finalfantasyxiv.com/lodestone/playguide/db/item/?patch=&db_search_category=item&category2=&q=${encodeURIComponent(effectiveItem.name || '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: '0.82rem', padding: '6px 12px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+                  >
+                    Lodestone <i className="fa-solid fa-arrow-up-right-from-square"></i>
+                  </a>
+
+                  {/* Fullscreen Toggle in Top Bar */}
+                  <button
+                    type="button"
+                    onClick={() => setIsFullscreen((prev) => !prev)}
+                    className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                      isFullscreen
+                        ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                        : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border-cyan-500/40 hover:border-cyan-400'
+                    }`}
+                    title={isFullscreen ? '全画面表示を解除 (Esc)' : 'ツリーを画面いっぱいに全画面表示'}
+                  >
+                    <i className={`fa-solid ${isFullscreen ? 'fa-compress' : 'fa-expand'}`}></i>
+                    <span>{isFullscreen ? '通常表示 (Esc)' : '全画面'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex-1 w-full min-h-0 overflow-hidden relative">
+              <InteractiveNodeCanvas
+                selectedItem={effectiveItem}
+                tree={liveTree}
+                currentWorld={salesScopeName}
+                onOpenMarketModal={onSelectItemForModal}
+                onToggleQuality={handleToggleQuality}
+                onToggleSelfSufficient={handleToggleSelfSufficient}
+                craftCount={enrichedTargets[0]?.craftCount || 1}
+                onChangeCraftCount={(val) => {
+                  if (enrichedTargets.length > 0) {
+                    handleUpdateTargetCraftCount(enrichedTargets[0].cardKey, val);
+                  }
+                }}
+                purchasedMap={purchasedMap}
+                onSetPurchased={handleSetPurchased}
+                onToggleFullPurchased={handleToggleFullPurchased}
+                onClearPurchased={handleClearPurchased}
+                selectedTargets={enrichedTargets}
+                onUpdateTargetCraftCount={handleUpdateTargetCraftCount}
+                onRemoveTarget={handleRemoveTarget}
+              />
             </div>
           </div>
           );

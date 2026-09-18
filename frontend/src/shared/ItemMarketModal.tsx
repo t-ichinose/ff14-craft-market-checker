@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { TrendChartCanvas } from './TrendChartCanvas';
-import { JAPAN_DCS, WORLD_TO_DC } from './marketConstants';
+import { JAPAN_DCS, WORLD_TO_DC, ALL_JAPAN_WORLDS, getSavedSharedWorld } from './marketConstants';
 import {
   fetchMarketHistory,
   fetchMarketListings,
@@ -54,8 +54,11 @@ export const ItemMarketModal: React.FC<ItemMarketModalProps> = ({
   initialHq = false,
   onClose
 }) => {
-  const homeWorld = worldName;
-  const [activeWorld, setActiveWorld] = useState<string>(worldName);
+  const safeWorld = (worldName && ALL_JAPAN_WORLDS.includes(worldName))
+    ? worldName
+    : (getSavedSharedWorld() || 'Carbuncle');
+  const homeWorld = safeWorld;
+  const [activeWorld, setActiveWorld] = useState<string>(safeWorld);
   const [isHq, setIsHq] = useState<boolean>(initialHq);
   const [meta, setMeta] = useState<{ name: string; icon: string; category: string } | null>(null);
 
@@ -71,14 +74,14 @@ export const ItemMarketModal: React.FC<ItemMarketModalProps> = ({
     dc: [string, number];
     all: [string, number];
   }>({
-    selWorld: [worldName, 0],
+    selWorld: [safeWorld, 0],
     dc: ['-', 0],
     all: ['-', 0]
   });
 
   // Left pane: Instant initial state from shared memory (0ms first frame render)
   const [homeStats, setHomeStats] = useState<{ min: number; avg: number; max: number; velocity: number }>(() => {
-    const it = getSharedMarketItem(worldName, itemId, initialHq);
+    const it = getSharedMarketItem(safeWorld, itemId, initialHq);
     if (it) {
       return {
         min: it.min_price || 0,
@@ -91,7 +94,7 @@ export const ItemMarketModal: React.FC<ItemMarketModalProps> = ({
   });
 
   const [homeDailyTrends, setHomeDailyTrends] = useState<DailyTrendPoint[]>(() => {
-    const it = getSharedMarketItem(worldName, itemId, initialHq);
+    const it = getSharedMarketItem(safeWorld, itemId, initialHq);
     if (it?.daily_trend && it.daily_trend.length > 0) {
       return it.daily_trend.map((t: any) => ({
         date: t.date,
@@ -103,13 +106,13 @@ export const ItemMarketModal: React.FC<ItemMarketModalProps> = ({
   });
 
   const [homeHistory, setHomeHistory] = useState<HistoryItem[]>(() => {
-    const it = getSharedMarketItem(worldName, itemId, initialHq);
+    const it = getSharedMarketItem(safeWorld, itemId, initialHq);
     if (it?.history && it.history.length > 0) {
       return it.history.map((h: any) => ({
         pricePerUnit: h.price,
         quantity: h.qty,
         total: (h.price || 0) * (h.qty || 0),
-        worldName: worldName,
+        worldName: safeWorld,
         buyerName: h.buyer || '-',
         timestamp: h.ts,
         hq: Boolean(h.hq)
@@ -119,7 +122,7 @@ export const ItemMarketModal: React.FC<ItemMarketModalProps> = ({
   });
 
   const [homeTrendPct, setHomeTrendPct] = useState<number>(() => {
-    const it = getSharedMarketItem(worldName, itemId, initialHq);
+    const it = getSharedMarketItem(safeWorld, itemId, initialHq);
     return it?.trend_pct || 0;
   });
 
@@ -324,7 +327,7 @@ export const ItemMarketModal: React.FC<ItemMarketModalProps> = ({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80 backdrop-blur-md animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-[100000] flex items-center justify-center p-3 bg-black/80 backdrop-blur-md animate-in fade-in duration-150 select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}

@@ -8,6 +8,7 @@ export interface RecipeTreeItem {
   icon: string;
   cost: number;
   marketPrice: number;
+  craftCost?: number;     // この素材自作時の1個あたり原価 (中間素材の場合)
   method: 'buy_npc' | 'craft' | 'buy_market' | 'self_sufficient';
   world: string;
   amount: number;
@@ -70,6 +71,13 @@ export interface CraftCardItem {
   daily_profit: number;
   daily_trend?: { date: string; weighted_avg: number; volume: number }[];
   trend_pct?: number;
+}
+
+export interface SelectedCraftTarget {
+  cardKey: string;
+  item: CraftCardItem;
+  craftCount: number;
+  tree?: RecipeTreeItem[];
 }
 
 export interface CraftPlannerViewProps {

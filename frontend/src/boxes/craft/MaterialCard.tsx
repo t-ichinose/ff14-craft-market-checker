@@ -29,13 +29,13 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
   const isNpc = mat.method === 'buy_npc';
   const isActive = mat.isActive;
   const isHq = mat.quality === 'hq';
-  const hasSubs = mat.subs && mat.subs.length > 0;
   const lodestoneUrl = `https://jp.finalfantasyxiv.com/lodestone/playguide/db/item/?patch=&db_search_category=item&category2=&q=${encodeURIComponent(mat.name || '')}`;
   const targetModalWorld = (mat.world && mat.world !== '自作' && mat.world !== 'NPC店売り' && mat.world !== '不明' && !mat.world.includes('自給')) ? mat.world : currentWorld;
 
   // 親が複数完成レシピの場合の実質負担額
   const parentYield = mat.parentYield || 1;
   const effectiveTotalCost = isSelfSufficient ? 0 : (mat.effectiveCost !== undefined ? mat.effectiveCost : (parentYield > 1 ? Math.round(totalCost / parentYield) : totalCost));
+  const isCraftable = (mat.craftCost !== undefined && mat.craftCost > 0) || (mat.subs && mat.subs.length > 0);
 
   return (
     <div
@@ -59,12 +59,6 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
             : 'bg-gradient-to-br from-amber-950/50 via-slate-900/95 to-slate-950 border-amber-500/40 group-hover:border-amber-400 shadow-[0_0_16px_rgba(245,158,11,0.15)]'
         }`}
       >
-        {!isActive && (
-          <div className="absolute -top-2 right-2 bg-slate-800 border border-slate-600 text-slate-300 text-[0.55rem] font-bold px-1.5 py-0.2 rounded-md shadow-md flex items-center gap-1 z-30">
-            <i className="fa-solid fa-ban text-rose-400 text-[0.5rem]"></i> スキップ
-          </div>
-        )}
-
         {/* Row 1 (上段): アイコン + アイテム名 + 右側アクション(×数量 / 相場 / Lodestone) */}
         <div className="flex items-center gap-2 min-w-0">
           <div className="relative shrink-0">
@@ -101,7 +95,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
               {mat.name || `Item #${mat.id}`}
             </span>
 
-            {/* 右上: 数量バッジ + 相場ボタン + Lodestone */}
+            {/* 右上: 数量バッジ + 相場ボタン + Lodestone + 製作/購入バッジ (右上固定) */}
             <div className="flex items-center gap-1 shrink-0">
               <span className="text-[0.72rem] font-black px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono shadow-sm">
                 ×{amount}
@@ -126,6 +120,29 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
               >
                 <i className="fa-solid fa-arrow-up-right-from-square"></i>
               </a>
+
+              {/* 右上端固定: スキップ時は「スキップ」のみ表示、通常時は「製作 / 購入 / 店売 / 自給」 */}
+              {!isActive ? (
+                <span className="text-[0.6rem] font-bold px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-0.5 shadow-sm">
+                  <i className="fa-solid fa-ban text-rose-400 text-[0.5rem]"></i> スキップ
+                </span>
+              ) : isSelfSufficient ? (
+                <span className="text-[0.6rem] font-black px-1.5 py-0.2 rounded bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 flex items-center gap-0.5 shadow-sm">
+                  <i className="fa-solid fa-leaf text-[0.5rem]"></i> 自給
+                </span>
+              ) : isCrafted ? (
+                <span className="text-[0.6rem] font-black px-1.5 py-0.2 rounded bg-sky-500/25 text-sky-300 border border-sky-500/50 flex items-center gap-0.5 shadow-sm">
+                  <i className="fa-solid fa-hammer text-[0.5rem]"></i> 製作
+                </span>
+              ) : isNpc ? (
+                <span className="text-[0.6rem] font-black px-1.5 py-0.2 rounded bg-teal-500/25 text-teal-300 border border-teal-500/40 flex items-center gap-0.5 shadow-sm">
+                  <i className="fa-solid fa-shop text-[0.5rem]"></i> 店売
+                </span>
+              ) : (
+                <span className="text-[0.6rem] font-black px-1.5 py-0.2 rounded bg-amber-500/25 text-amber-300 border border-amber-500/40 flex items-center gap-0.5 shadow-sm">
+                  <i className="fa-solid fa-cart-shopping text-[0.5rem]"></i> 購入
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -156,9 +173,12 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
               <i className="fa-solid fa-location-dot text-cyan-400 text-[0.55rem]"></i> {mat.world}
             </span>
 
-            {isCrafted && mat.yieldAmt && mat.yieldAmt > 1 && (
-              <span className="text-[0.58rem] text-sky-300 bg-sky-950/60 px-1 py-0.2 rounded border border-sky-500/30 shrink-0">
-                1回{mat.yieldAmt}個
+            {mat.yieldAmt && mat.yieldAmt > 1 && (
+              <span
+                className="text-[0.58rem] text-sky-300 bg-sky-950/60 px-1 py-0.2 rounded border border-sky-500/30 shrink-0"
+                title={`1回の製作で${mat.yieldAmt}個完成`}
+              >
+                1回{mat.yieldAmt}個{isCrafted ? ` (${Math.ceil(amount / mat.yieldAmt)}回製作)` : ''}
               </span>
             )}
           </div>
@@ -226,36 +246,40 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
           </div>
         </div>
 
-        {/* Row 3 (下段): Price Grid (単価 + 推奨/実質バッジ + 総額) */}
+        {/* Row 3 (下段): Price Grid (単価 + 製作原価vs目標購入額 + 総額) */}
         <div className="bg-black/70 rounded-md px-2 py-0.8 border border-white/10 flex items-center justify-between text-[0.65rem] gap-1 overflow-hidden">
           <div className="flex items-center gap-1 text-slate-300 font-mono whitespace-nowrap shrink-0">
             <span className="text-[0.62rem] font-sans text-slate-400">
-              {isSelfSufficient ? '調達:' : isNpc ? '店売:' : isCrafted ? '自作:' : '仕入:'}
+              {isSelfSufficient ? '自給:' : isNpc ? '店売:' : isCrafted ? '自作:' : '購入目標:'}
             </span>
-            <strong className={`${isSelfSufficient ? 'text-emerald-400' : isCrafted ? 'text-sky-300' : 'text-purple-300'} font-bold text-[0.74rem]`}>
-              {isSelfSufficient ? '0' : mat.cost.toLocaleString()}
+            <strong className={`${isSelfSufficient ? 'text-emerald-400' : isCrafted ? 'text-sky-300' : 'text-amber-300'} font-bold text-[0.74rem]`}>
+              {isSelfSufficient ? '0' : (isCrafted ? (mat.craftCost || mat.cost) : (mat.marketPrice || mat.cost)).toLocaleString()}
             </strong>
             <span className="text-[0.58rem] font-bold text-amber-400 font-sans">
-              {isSelfSufficient ? 'G (自給)' : isNpc ? 'G' : isCrafted ? 'G' : 'G以下'}
+              G
             </span>
           </div>
 
           <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
-            {isSelfSufficient ? (
+            {/* 中間素材の場合: 製作原価 vs 購入目標額 ギャップバッジ */}
+            {isCraftable && mat.marketPrice > 0 ? (
+              <span className={`text-[0.55rem] font-bold px-1 py-0.2 rounded border whitespace-nowrap ${
+                (mat.craftCost || 0) <= mat.marketPrice
+                  ? 'text-sky-300 bg-sky-950/70 border-sky-500/40'
+                  : 'text-amber-300 bg-amber-950/70 border-amber-500/40'
+              }`}>
+                {(mat.craftCost || 0) <= mat.marketPrice
+                  ? `自作 ${mat.craftCost}G (▲${(mat.marketPrice - (mat.craftCost || 0)).toLocaleString()}G)`
+                  : `購入 ${mat.marketPrice}G (▲${((mat.craftCost || 0) - mat.marketPrice).toLocaleString()}G)`
+                }
+              </span>
+            ) : isSelfSufficient ? (
               <span className="text-[0.55rem] font-bold text-emerald-300 bg-emerald-950/70 px-1 py-0.2 rounded border border-emerald-500/40 whitespace-nowrap">
-                自給自足 (0G)
+                自給 (0G)
               </span>
             ) : parentYield > 1 ? (
               <span className="text-[0.55rem] font-bold text-emerald-300 bg-emerald-950/70 px-1 py-0.2 rounded border border-emerald-500/40 whitespace-nowrap">
                 親{parentYield}個分: {effectiveTotalCost.toLocaleString()}G
-              </span>
-            ) : hasSubs && mat.savings !== undefined && mat.savings > 0 ? (
-              <span className={`text-[0.55rem] font-bold px-1 py-0.2 rounded border whitespace-nowrap ${
-                isCrafted
-                  ? 'text-sky-300 bg-sky-950/70 border-sky-500/40'
-                  : 'text-amber-300 bg-amber-950/70 border-amber-500/40'
-              }`}>
-                {isCrafted ? '自作' : 'マケボ'}+{mat.savings.toLocaleString()}G
               </span>
             ) : null}
 

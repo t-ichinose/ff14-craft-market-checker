@@ -11,6 +11,7 @@ import type {
   CanvasEdge,
   ProcurementItem,
   SourcingScope,
+  SelectedCraftTarget,
 } from './craftTypes';
 
 /**
@@ -73,9 +74,9 @@ export function resolveFullTreeForScope(
   const safeParentYield = Math.max(1, parentYield || 1);
 
   return rec.ings.map(([ingId, rawAmt]) => {
-    const amt = Math.max(1, rawAmt || 1);
+    const amt = rawAmt;
     const idStr = ingId.toString();
-    const meta = marketData.items[idStr] || { name: '', icon: '', shop_price: 0, category: '' };
+    const meta = marketData.items[idStr] || {};
 
     // 多重フォールバック (カタログ未展開時でもmarketData.dataから名前とアイコンを救出)
     let fallbackName = '';
@@ -121,10 +122,11 @@ export function resolveFullTreeForScope(
       ? (hqMarketPrice > 0 ? hqCheapWorld : nqCheapWorld)
       : nqCheapWorld;
 
-    // 自給自足 (0G) 判定
+    // 自給自足 (0G) 判定: 自給ボタンが押された場合のみ適用
     const isSelfSufficient = !!selfSufficientMap?.[ingId];
 
-    if (isSelfSufficient) {
+    // 末端素材 (サブレシピなし) の自給自足 (0G) 判定
+    if (isSelfSufficient && !hasSubRecipe) {
       return {
         id: ingId,
         name,
@@ -148,7 +150,7 @@ export function resolveFullTreeForScope(
       safeParentYield > 1 ? Math.round((shopPrice * amt) / safeParentYield) : shopPrice * amt;
 
     // NPC店売りが最安の場合 (※NPCはNQのみ販売のため、HQ指定時はNPC店売り不可)
-    if (currentQuality === 'nq' && shopPrice > 0 && (effectiveMarketPrice === 0 || shopPrice <= effectiveMarketPrice)) {
+    if (!isSelfSufficient && currentQuality === 'nq' && shopPrice > 0 && (effectiveMarketPrice === 0 || shopPrice <= effectiveMarketPrice)) {
       return {
         id: ingId,
         name,
@@ -185,12 +187,41 @@ export function resolveFullTreeForScope(
         qualityMap,
         selfSufficientMap
       );
+
       const subCraftCostTotal = tempSubTree
         .filter((t) => t.isActive)
         .reduce((sum, sub) => sum + sub.cost * sub.amount, 0);
       const unitCraftCost = Math.round(subCraftCostTotal / subYield);
 
-      const shouldCraft = isParentActive && (effectiveMarketPrice === 0 || unitCraftCost < effectiveMarketPrice);
+      // 中間素材自給自足 (0G) の場合: 自身の手持ち・自給なので下位素材はスキップ(購入不要)扱い
+      if (isSelfSufficient) {
+        return {
+          id: ingId,
+          name,
+          icon,
+          cost: 0,
+          marketPrice: effectiveMarketPrice,
+          craftCost: unitCraftCost,
+          batchCost: subCraftCostTotal,
+          method: 'self_sufficient',
+          world: '自給 (0G)',
+          amount: amt,
+          isActive: isParentActive,
+          savings: effectiveMarketPrice * amt,
+          yieldAmt: subYield,
+          parentYield: safeParentYield,
+          effectiveCost: 0,
+          quality: currentQuality,
+          hasHqOption,
+          isSelfSufficient: true,
+          subs: applyCraftActiveState(tempSubTree, false),
+        };
+      }
+
+      // 製作/購入の自動判定（原価最適化）
+      const shouldCraft =
+        isParentActive &&
+        (effectiveMarketPrice === 0 || unitCraftCost < effectiveMarketPrice);
 
       // 2回目の重い再帰呼び出しを撤廃！shouldCraftがfalseの場合はisActiveをfalseに更新
       const finalSubTree = shouldCraft
@@ -204,13 +235,14 @@ export function resolveFullTreeForScope(
           icon,
           cost: unitCraftCost,
           marketPrice: effectiveMarketPrice,
+          craftCost: unitCraftCost,
+          batchCost: subCraftCostTotal,
           method: 'craft',
           world: '自作',
           amount: amt,
           isActive: isParentActive,
           savings: effectiveMarketPrice > 0 ? effectiveMarketPrice - unitCraftCost : 0,
           yieldAmt: subYield,
-          batchCost: subCraftCostTotal,
           parentYield: safeParentYield,
           effectiveCost:
             safeParentYield > 1 ? Math.round((unitCraftCost * amt) / safeParentYield) : unitCraftCost * amt,
@@ -225,11 +257,14 @@ export function resolveFullTreeForScope(
           icon,
           cost: effectiveMarketPrice,
           marketPrice: effectiveMarketPrice,
+          craftCost: unitCraftCost,
+          batchCost: subCraftCostTotal,
           method: 'buy_market',
           world: effectiveWorld,
           amount: amt,
           isActive: isParentActive,
           savings: unitCraftCost > 0 ? unitCraftCost - effectiveMarketPrice : 0,
+          yieldAmt: subYield,
           parentYield: safeParentYield,
           effectiveCost:
             safeParentYield > 1 ? Math.round((effectiveMarketPrice * amt) / safeParentYield) : effectiveMarketPrice * amt,
@@ -342,7 +377,9 @@ export function calculateTreeLayout(
     });
 
     if (item.subs && item.subs.length > 0) {
-      const childMultiplier = item.amount * multiplier;
+      const needed = item.amount * multiplier;
+      const yieldAmt = Math.max(1, item.yieldAmt || 1);
+      const childMultiplier = Math.ceil(needed / yieldAmt);
       let childY = startY;
       item.subs.forEach((subItem, idx) => {
         const h = computeSubtreeHeight(subItem);
@@ -997,3 +1034,292 @@ export function searchCraftPlaceholders(
 
   return placeholders;
 }
+
+/**
+ * 製造ライン（パイプライン）用の素材ノード
+ */
+export interface PipelineItem {
+  id: number;
+  name: string;
+  icon: string;
+  cost: number;
+  marketPrice: number;
+  craftCost?: number; // 中間素材の1個あたり製作原価
+  batchCost?: number; // 中間素材の1回クラフトあたりの素材原価
+  method: 'buy_npc' | 'craft' | 'buy_market' | 'self_sufficient';
+  world: string;
+  totalAmount: number;
+  activeAmount: number; // 採用ルートでの実調達数量
+  tier: number;
+  isActive: boolean; // 採用ルートかスキップ対象か
+  isSelfSufficient?: boolean;
+  quality?: 'nq' | 'hq';
+  hasHqOption?: boolean;
+  parentYield?: number;
+  effectiveCost?: number;
+  yieldAmt?: number; // 1回クラフトあたりの完成個数
+  job?: string;
+  ingredientIds: number[];
+  usedInIds: number[];
+  occurrences: number;
+}
+
+export interface PipelineStep {
+  tier: number;
+  title: string;
+  badge: string;
+  subtitle: string;
+  items: PipelineItem[];
+  totalCost: number;
+}
+
+/**
+ * 複数選択された完成品ターゲットから、共通素材を合算した製造ライン（パイプライン）を構築する
+ * （次工程直前配置 / ALAP ルール: 各素材をその消費工程の直前列に配置）
+ */
+export function buildMultiCraftPipeline(
+  targets: SelectedCraftTarget[]
+): { steps: PipelineStep[]; targets: SelectedCraftTarget[] } {
+  if (!targets || targets.length === 0) {
+    return { steps: [], targets: [] };
+  }
+
+  // 1. 各ノードのボトムアップ深さ（最長原料パス長）を再帰計算
+  function getBottomHeight(item: RecipeTreeItem): number {
+    if (!item.subs || item.subs.length === 0) {
+      return 0; // 原料・調達品 (高さ 0)
+    }
+    let maxSub = 0;
+    for (const sub of item.subs) {
+      maxSub = Math.max(maxSub, getBottomHeight(sub));
+    }
+    return maxSub + 1;
+  }
+
+  // 2. アイテムごとに数量と親子関係を集約（全ターゲットのツリーから共通素材を合算）
+  interface PipelineCollectorItem extends PipelineItem {
+    bottomHeight: number;
+    activeParentIds: Set<number>;
+    allParentIds: Set<number>;
+  }
+
+  const itemMap = new Map<number, PipelineCollectorItem>();
+
+  function traverse(item: RecipeTreeItem, parentId: number, currentMult: number) {
+    const bHeight = getBottomHeight(item);
+    const existing = itemMap.get(item.id);
+    const nodeQty = item.amount * currentMult;
+    const activeQty = item.isActive ? nodeQty : 0;
+
+    if (!existing) {
+      const activeParents = new Set<number>();
+      const allParents = new Set<number>();
+      if (parentId > 0) {
+        allParents.add(parentId);
+        if (item.isActive) {
+          activeParents.add(parentId);
+        }
+      }
+
+      itemMap.set(item.id, {
+        id: item.id,
+        name: item.name,
+        icon: item.icon,
+        cost: item.cost,
+        marketPrice: item.marketPrice,
+        craftCost: item.craftCost,
+        batchCost: item.batchCost,
+        method: item.method,
+        world: item.world,
+        totalAmount: nodeQty,
+        activeAmount: activeQty,
+        tier: 0,
+        isActive: !!item.isActive,
+        isSelfSufficient: item.isSelfSufficient,
+        quality: item.quality,
+        hasHqOption: item.hasHqOption,
+        parentYield: item.parentYield,
+        effectiveCost: item.effectiveCost,
+        yieldAmt: item.yieldAmt || 1,
+        ingredientIds: (item.subs || []).map((s) => s.id),
+        usedInIds: parentId > 0 && item.isActive ? [parentId] : [],
+        occurrences: item.isActive ? 1 : 0,
+        bottomHeight: bHeight,
+        activeParentIds: activeParents,
+        allParentIds: allParents,
+      });
+    } else {
+      existing.totalAmount += nodeQty;
+      existing.activeAmount += activeQty;
+      if (item.isActive) {
+        existing.occurrences += 1;
+        existing.isActive = true; // 1箇所でも採用されていればアクティブ
+      }
+      if (item.yieldAmt && item.yieldAmt > 1) {
+        existing.yieldAmt = item.yieldAmt;
+      }
+      if (item.craftCost !== undefined) {
+        existing.craftCost = item.craftCost;
+      }
+      if (item.batchCost !== undefined) {
+        existing.batchCost = item.batchCost;
+      }
+      if (parentId > 0) {
+        existing.allParentIds.add(parentId);
+        if (item.isActive) {
+          existing.activeParentIds.add(parentId);
+          if (!existing.usedInIds.includes(parentId)) {
+            existing.usedInIds.push(parentId);
+          }
+        }
+      }
+      if (bHeight > existing.bottomHeight) {
+        existing.bottomHeight = bHeight;
+      }
+      if (item.subs && item.subs.length > 0) {
+        item.subs.forEach((s) => {
+          if (!existing.ingredientIds.includes(s.id)) {
+            existing.ingredientIds.push(s.id);
+          }
+        });
+      }
+    }
+
+    if (item.subs && item.subs.length > 0) {
+      const itemYield = Math.max(1, item.yieldAmt || 1);
+      const batches = Math.ceil(nodeQty / itemYield);
+      item.subs.forEach((sub) => {
+        traverse(sub, item.id, batches);
+      });
+    }
+  }
+
+  const targetRootIds = new Set(targets.map((t) => t.item.item_id));
+
+  for (const target of targets) {
+    const safeMult = Math.max(1, target.craftCount || 1);
+    if (target.tree && target.tree.length > 0) {
+      target.tree.forEach((rootMat) => {
+        traverse(rootMat, target.item.item_id, safeMult);
+      });
+    }
+  }
+
+  // 3. パイプライン総段数 (stepCount) の算出
+  // 完成品直下の最大高さ + 1 が中間パイプラインの列数 (FINAL列は含まない)
+  let maxTreeDepth = 1;
+  for (const target of targets) {
+    if (target.tree && target.tree.length > 0) {
+      for (const rootMat of target.tree) {
+        maxTreeDepth = Math.max(maxTreeDepth, getBottomHeight(rootMat) + 1);
+      }
+    }
+  }
+  const stepCount = Math.max(1, maxTreeDepth);
+  const finalCol = stepCount; // 最終完成品列のインデックス
+
+  // 4. ALAP (As-Late-As-Possible / 次工程直前配置) による列(Tier)の確定
+  // 各アイテムは「自分を消費する最も若い工程の一列前 (minParentCol - 1)」に配置される。
+  // ただし、自身の下位素材を配置するスペースを確保するため bottomHeight 以上とする。
+  const colMap = new Map<number, number>();
+  for (const item of itemMap.values()) {
+    // 初期値: ひとまず最大中間列
+    colMap.set(item.id, stepCount - 1);
+  }
+
+  // DAG上の緩和反復 (深さ分繰り返すことで確実にトップダウン伝播)
+  for (let iter = 0; iter < stepCount + 2; iter++) {
+    for (const item of itemMap.values()) {
+      // 親の決定: アクティブな親があればそれらを使用、なければ全親を使用
+      const parentsToUse = item.activeParentIds.size > 0 ? item.activeParentIds : item.allParentIds;
+
+      let minParentCol = finalCol;
+      if (parentsToUse.size > 0) {
+        for (const pId of parentsToUse) {
+          if (targetRootIds.has(pId)) {
+            minParentCol = Math.min(minParentCol, finalCol);
+          } else if (colMap.has(pId)) {
+            minParentCol = Math.min(minParentCol, colMap.get(pId)!);
+          }
+        }
+      }
+
+      // 直前列: minParentCol - 1
+      let desired = minParentCol - 1;
+
+      // 自身の下位素材に必要な段数 (bottomHeight) を下回らないよう下限保証
+      if (desired < item.bottomHeight) {
+        desired = item.bottomHeight;
+      }
+
+      // [0, stepCount - 1] の範囲に収める
+      desired = Math.max(0, Math.min(stepCount - 1, desired));
+
+      colMap.set(item.id, desired);
+    }
+  }
+
+  // 各アイテムに確定した Tier (列インデックス) を反映
+  for (const item of itemMap.values()) {
+    item.tier = colMap.get(item.id) ?? 0;
+  }
+
+  // 5. ステップ列の生成
+  const steps: PipelineStep[] = [];
+
+  for (let t = 0; t < stepCount; t++) {
+    let title = '';
+    let badge = `Step ${t + 1}`;
+    let subtitle = '';
+
+    if (t === 0) {
+      title = '初期原料・一次加工';
+      subtitle = '初期投入素材・基本加工';
+    } else if (t === 1) {
+      title = '中間加工・部材調達';
+      subtitle = '中間加工・次工程投入素材';
+    } else if (t === 2) {
+      title = '直前加工・組立部材';
+      subtitle = '上位部材・最終組立直前素材';
+    } else if (t === 3) {
+      title = '上位組立・直前部材';
+      subtitle = '大型パーツ・最終投入素材';
+    } else {
+      title = `工程 ${t + 1}（中間部材）`;
+      subtitle = '次工程・直前投入部材';
+    }
+
+    steps.push({
+      tier: t,
+      title,
+      badge,
+      subtitle,
+      items: [],
+      totalCost: 0,
+    });
+  }
+
+  for (const item of itemMap.values()) {
+    const step = steps[item.tier];
+    if (step) {
+      step.items.push(item);
+      if (item.isActive) {
+        const activeQty = item.activeAmount > 0 ? item.activeAmount : item.totalAmount;
+        const itemCost = item.isSelfSufficient ? 0 : (item.cost || item.marketPrice || 0) * activeQty;
+        step.totalCost += itemCost;
+      }
+    }
+  }
+
+  steps.forEach((step) => {
+    step.items.sort((a, b) => {
+      if (a.isActive && !b.isActive) return -1;
+      if (!a.isActive && b.isActive) return 1;
+      const costA = (a.cost || a.marketPrice || 0) * (a.isActive ? a.activeAmount : a.totalAmount);
+      const costB = (b.cost || b.marketPrice || 0) * (b.isActive ? b.activeAmount : b.totalAmount);
+      return costB - costA;
+    });
+  });
+
+  return { steps, targets };
+}

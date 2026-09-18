@@ -8,6 +8,7 @@ import { CraftBox } from './boxes/craft/CraftBox';
 
 // 🛠️ 共通設備（モーダル等）
 import { ItemMarketModal } from './shared/ItemMarketModal';
+import { ALL_JAPAN_WORLDS, getSavedSharedWorld } from './shared/marketConstants';
 import { prefetchRecipes } from './services/recipeDataService';
 import { fetchAndPrepareMarketData, fetchAndPrepareListingsData } from './services/marketDataService';
 
@@ -207,7 +208,12 @@ export const App: React.FC = () => {
               scopes={JAPAN_SCOPE_OPTIONS}
               initialSalesWorld="Carbuncle"
               initialSourcingScope="world"
-              onSelectItemForModal={(id, world, isHq) => setSelectedModalItemId({ id, world: world || 'Carbuncle', isHq })}
+              onSelectItemForModal={(id, world, isHq) => {
+                const safeWorld = (world && ALL_JAPAN_WORLDS.includes(world))
+                  ? world
+                  : (getSavedSharedWorld() || 'Carbuncle');
+                setSelectedModalItemId({ id, world: safeWorld, isHq });
+              }}
             />
           </div>
         )}
