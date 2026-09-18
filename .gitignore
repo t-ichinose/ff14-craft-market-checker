@@ -22,3 +22,13 @@ Thumbs.db
 .vscode/
 .idea/
 .env
+
+# Data assets (distributed via GitHub Releases, not git tracked)
+*.json.gz
+data/*.json.gz
+frontend/public/*.json.gz
+data/recipes.json
+data/recipes.json.gz
+frontend/public/recipes.json
+frontend/public/recipes.json.gz
+data/marketable_item_ids.txt

@@ -45,17 +45,13 @@ jobs:
           cd frontend
           npm ci
 
-      - name: Ensure public data is up to date
+      - name: Download latest data assets from Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ -f data/data.json.gz ]; then
-            cp data/data.json.gz frontend/public/data.json.gz
-          fi
-          if [ -f data/recipes.json ]; then
-            cp data/recipes.json frontend/public/recipes.json
-          fi
-          if [ -f data/listings.json.gz ]; then
-            cp data/listings.json.gz frontend/public/listings.json.gz
-          fi
+          mkdir -p frontend/public
+          gh release download data-latest --repo ${{ github.repository }} --dir frontend/public/ --clobber || true
+          ls -lh frontend/public/
 
       - name: Build with Vite
         run: |

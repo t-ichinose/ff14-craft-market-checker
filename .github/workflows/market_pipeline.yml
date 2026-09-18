@@ -48,6 +48,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install httpx
 
+      - name: Download existing data assets from Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p data frontend/public
+          gh release download data-latest --repo ${{ github.repository }} --dir data/ --clobber || true
+          cp data/*.json.gz frontend/public/ 2>/dev/null || true
+          cp data/*.json frontend/public/ 2>/dev/null || true
+
       - name: Restore / Cache SQLite Database
         uses: actions/cache@v4
         with:
@@ -75,38 +84,17 @@ jobs:
         run: |
           ls -lh frontend/public/data.json.gz || true
 
-      - name: Commit and push updated data
+      - name: Upload updated data to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          COMMIT_MSG="Auto-update market data (${{ inputs.test_mode || 'Scheduled' }})"
-
-          git add -f frontend/public/data.json.gz data/data.json.gz frontend/public/recipes.json frontend/public/recipes.json.gz data/recipes.json data/recipes.json.gz data/items_metadata.json.gz data/marketable_item_ids.txt || true
-
-          if git diff --staged --quiet; then
-            echo "No data changes to commit."
-            exit 0
-          fi
-
-          echo "📦 Creating data update commit..."
-          git commit -m "$COMMIT_MSG"
-
-          for i in {1..5}; do
-            echo "=== Syncing and pushing market data (Attempt $i/5) ==="
-            if git pull --rebase origin main; then
-              if git push origin main; then
-                echo "✨ Successfully pushed data commit!"
-                exit 0
-              fi
-            else
-              echo "Rebase conflict encountered, aborting rebase..."
-              git rebase --abort || true
-            fi
-
-            echo "Push or rebase failed or conflicted with a concurrent push. Retrying in 3 seconds..."
-            sleep 3
-          done
-
-          echo "❌ Failed to push after 5 attempts."
-          exit 1
+          gh release view data-latest --repo ${{ github.repository }} || gh release create data-latest --title "Latest Market Data" --notes "Automated data assets for FF14 Craft Market Checker" --repo ${{ github.repository }}
+          gh release upload data-latest \
+            frontend/public/data.json.gz \
+            frontend/public/recipes.json \
+            frontend/public/recipes.json.gz \
+            data/items_metadata.json.gz \
+            data/marketable_item_ids.txt \
+            --repo ${{ github.repository }} \
+            --clobber
+          echo "✨ Successfully uploaded updated market data to Release data-latest!"
