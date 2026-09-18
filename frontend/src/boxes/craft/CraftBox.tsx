@@ -876,14 +876,17 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
                           <span style={{ fontSize: '0.63rem', color: '#94a3b8' }}>目標仕入:</span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                            <strong style={{ color: '#c084fc', fontSize: '0.78rem', fontFamily: 'Outfit, sans-serif' }}>{displayItem.craft_cost.toLocaleString()}</strong>
-                            <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#ffb703' }}>G/以下</span>
-                          </span>
+                          <strong style={{ color: '#c084fc', fontSize: '0.78rem', fontFamily: 'Outfit, sans-serif' }}>
+                            {displayItem.max_buy_price ? `${displayItem.max_buy_price.toLocaleString()}G以下` : `${displayItem.craft_cost.toLocaleString()}G以下`}
+                          </strong>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: '0.60rem', color: '#64748b' }}>総素材費:</span>
-                          <span style={{ color: '#94a3b8', fontSize: '0.64rem', fontFamily: 'Outfit, sans-serif' }}>{displayItem.batch_cost.toLocaleString()}G</span>
+                          <span style={{ fontSize: '0.60rem', color: '#64748b' }}>
+                            原価: <strong style={{ color: displayItem.craft_cost <= (displayItem.max_buy_price || displayItem.craft_cost) ? '#10b981' : '#f87171', fontFamily: 'Outfit, sans-serif' }}>{displayItem.craft_cost.toLocaleString()}G</strong>
+                          </span>
+                          <span style={{ color: '#64748b', fontSize: '0.58rem', fontFamily: 'Outfit, sans-serif' }}>
+                            (総素材: {displayItem.batch_cost.toLocaleString()}G)
+                          </span>
                         </div>
                       </div>
 
@@ -1114,7 +1117,7 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
                 </button>
 
                 <div className="text-[0.7rem] text-slate-400">
-                  完成原価: <strong className="text-purple-300 font-bold">{effectiveItem.craft_cost.toLocaleString()} G/以下</strong> / 個
+                  完成原価: <strong className="text-emerald-400 font-bold">{effectiveItem.craft_cost.toLocaleString()}G</strong> / 個
                   {effectiveItem.amt > 1 && (
                     <span className="text-slate-400 ml-1.5 font-mono">
                       (1回分総素材費: {effectiveItem.batch_cost.toLocaleString()}G ÷ {effectiveItem.amt}個完成)
@@ -1139,6 +1142,7 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
                   onClearSelfSufficient={handleClearSelfSufficient}
                   isFullscreen={isFullscreen}
                   onToggleFullscreen={() => setIsFullscreen((prev) => !prev)}
+                  craftCount={craftCount}
                 />
               </div>
               {isShoppingListOpen && (

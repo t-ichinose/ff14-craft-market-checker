@@ -1,6 +1,74 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { CraftCardItem, RecipeTreeItem, ProcurementItem } from './craftTypes';
 import { aggregateProcurementItems } from './craftTreeUtils';
+
+interface WheelNumberInputProps {
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  shiftStep?: number;
+  onChange: (val: number) => void;
+  className?: string;
+  title?: string;
+}
+
+/**
+ * ホイール操作時に親や画面のスクロールを100%防止（e.preventDefault）し、
+ * カーソル選択時に全選択（全ハイライト）される数値入力コンポーネント
+ */
+const WheelNumberInput: React.FC<WheelNumberInputProps> = ({
+  value,
+  min = 0,
+  max = 9999,
+  step = 1,
+  shiftStep = 5,
+  onChange,
+  className = '',
+  title = '',
+}) => {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // ★ passive: false なのでブラウザのスクロールが100%確実に停止する
+      e.preventDefault();
+      e.stopPropagation();
+
+      const delta = e.deltaY < 0 ? 1 : -1;
+      const currentStep = e.shiftKey ? shiftStep : step;
+      const nextVal = Math.min(max, Math.max(min, value + delta * currentStep));
+      onChange(nextVal);
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+    };
+  }, [value, min, max, step, shiftStep, onChange]);
+
+  return (
+    <input
+      ref={inputRef}
+      type="number"
+      min={min}
+      max={max}
+      value={value}
+      title={title}
+      onClick={(e) => e.stopPropagation()}
+      onFocus={(e) => e.target.select()}
+      onChange={(e) => {
+        e.stopPropagation();
+        const val = parseInt(e.target.value, 10);
+        onChange(isNaN(val) || val < min ? min : Math.min(max, val));
+      }}
+      className={className}
+    />
+  );
+};
 
 export interface ShoppingListPanelProps {
   selectedItem: CraftCardItem;
@@ -172,7 +240,9 @@ export const ShoppingListPanel: React.FC<ShoppingListPanelProps> = React.memo(({
     return (
       <div
         key={it.id}
-        className={`p-2.5 rounded-xl border transition-all flex flex-col gap-2 ${
+        onClick={() => onOpenMarketModal && onOpenMarketModal(it.id, it.world !== 'NPC店売り' ? it.world : salesWorld, it.quality === 'hq')}
+        title={`${it.name} (クリックで全32ワールド相場モニターを開く)`}
+        className={`p-2.5 rounded-xl border transition-all flex flex-col gap-2 cursor-pointer ${
           isSelfSufficient
             ? 'bg-emerald-950/20 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
             : isCompleted
@@ -377,19 +447,7 @@ export const ShoppingListPanel: React.FC<ShoppingListPanelProps> = React.memo(({
             )}
           </div>
 
-          <div
-            className="flex items-center gap-1.5"
-            onWheel={(e) => {
-              e.stopPropagation();
-              const step = e.shiftKey ? 5 : 1;
-              if (e.deltaY < 0) {
-                onSetPurchased(it.id, Math.min(9999, purchased + step));
-              } else if (e.deltaY > 0) {
-                onSetPurchased(it.id, Math.max(0, purchased - step));
-              }
-            }}
-            title="購入数（マウスホイールで±1、Shift+ホイールで±5）"
-          >
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={(e) => {
@@ -402,18 +460,13 @@ export const ShoppingListPanel: React.FC<ShoppingListPanelProps> = React.memo(({
               -
             </button>
 
-            <input
-              type="number"
+            <WheelNumberInput
               min={0}
               max={9999}
               value={purchased}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => {
-                e.stopPropagation();
-                const val = parseInt(e.target.value, 10);
-                onSetPurchased(it.id, isNaN(val) || val < 0 ? 0 : val);
-              }}
-              className={`w-11 h-5 text-center text-xs font-black font-mono rounded border focus:outline-none focus:border-cyan-400 cursor-ns-resize shadow-inner ${
+              onChange={(val) => onSetPurchased(it.id, val)}
+              title="ホイールで増減（Shiftで±5） / クリックで全選択して直接入力"
+              className={`w-11 h-5 text-center text-xs font-black font-mono rounded border focus:outline-none focus:border-cyan-400 shadow-inner ${
                 isCompleted
                   ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/50'
                   : purchased > 0
@@ -473,19 +526,7 @@ export const ShoppingListPanel: React.FC<ShoppingListPanelProps> = React.memo(({
         </button>
       </div>
 
-      <div
-        className="px-3 py-2 border-b border-white/10 bg-black/30 shrink-0 flex items-center justify-between"
-        onWheel={(e) => {
-          e.stopPropagation();
-          const step = e.shiftKey ? 5 : 1;
-          if (e.deltaY < 0) {
-            onChangeCraftCount(Math.min(999, craftCount + step));
-          } else if (e.deltaY > 0) {
-            onChangeCraftCount(Math.max(1, craftCount - step));
-          }
-        }}
-        title="製作回数（マウスホイールで±1、Shift+ホイールで±5）"
-      >
+      <div className="px-3 py-2 border-b border-white/10 bg-black/30 shrink-0 flex items-center justify-between">
         <span className="text-[0.68rem] font-bold text-slate-300 flex items-center gap-1.5">
           <i className="fa-solid fa-hammer text-cyan-400 text-[0.65rem]"></i>
           <span>製作回数:</span>
@@ -503,17 +544,13 @@ export const ShoppingListPanel: React.FC<ShoppingListPanelProps> = React.memo(({
             -
           </button>
           <div className="relative group">
-            <input
-              type="number"
+            <WheelNumberInput
               min={1}
               max={999}
               value={craftCount}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                onChangeCraftCount(isNaN(val) || val < 1 ? 1 : Math.min(999, val));
-              }}
-              className="w-14 h-6 text-center text-xs font-black font-mono text-cyan-300 bg-slate-950 border border-cyan-500/40 rounded focus:outline-none focus:border-cyan-400 cursor-ns-resize shadow-inner"
-              title="ホイールで増減 / 直接入力"
+              onChange={onChangeCraftCount}
+              title="ホイールで増減（Shiftで±5） / クリックで全選択して直接入力"
+              className="w-14 h-6 text-center text-xs font-black font-mono text-cyan-300 bg-slate-950 border border-cyan-500/40 rounded focus:outline-none focus:border-cyan-400 shadow-inner"
             />
           </div>
           <button

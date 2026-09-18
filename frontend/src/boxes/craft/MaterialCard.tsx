@@ -229,12 +229,14 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
         {/* Row 3 (下段): Price Grid (単価 + 推奨/実質バッジ + 総額) */}
         <div className="bg-black/70 rounded-md px-2 py-0.8 border border-white/10 flex items-center justify-between text-[0.65rem] gap-1 overflow-hidden">
           <div className="flex items-center gap-1 text-slate-300 font-mono whitespace-nowrap shrink-0">
-            <span className="text-[0.62rem] font-sans text-slate-400">{isSelfSufficient ? '調達:' : isNpc ? '店売:' : '単価:'}</span>
-            <strong className={`${isSelfSufficient ? 'text-emerald-400' : 'text-sky-300'} font-bold text-[0.74rem]`}>
+            <span className="text-[0.62rem] font-sans text-slate-400">
+              {isSelfSufficient ? '調達:' : isNpc ? '店売:' : isCrafted ? '自作:' : '仕入:'}
+            </span>
+            <strong className={`${isSelfSufficient ? 'text-emerald-400' : isCrafted ? 'text-sky-300' : 'text-purple-300'} font-bold text-[0.74rem]`}>
               {isSelfSufficient ? '0' : mat.cost.toLocaleString()}
             </strong>
             <span className="text-[0.58rem] font-bold text-amber-400 font-sans">
-              {isSelfSufficient ? 'G (自給)' : isNpc ? 'G' : 'G/以下'}
+              {isSelfSufficient ? 'G (自給)' : isNpc ? 'G' : isCrafted ? 'G' : 'G以下'}
             </span>
           </div>
 

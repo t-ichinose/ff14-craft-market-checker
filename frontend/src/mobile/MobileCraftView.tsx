@@ -989,13 +989,13 @@ export const MobileCraftView: React.FC<MobileCraftViewProps> = React.memo(({
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[0.58rem] text-slate-400">目標仕入額</span>
-                        <span className="text-[0.72rem] font-bold font-mono text-amber-300 truncate">
-                          {item.craft_cost.toLocaleString()}G
+                        <span className="text-[0.72rem] font-bold font-mono text-purple-300 truncate">
+                          {item.max_buy_price ? `${item.max_buy_price.toLocaleString()}G以下` : `${item.craft_cost.toLocaleString()}G`}
                         </span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[0.58rem] text-slate-400">想定売価 (手残)</span>
-                        <span className="text-[0.72rem] font-bold font-mono text-slate-200 truncate">
+                        <span className="text-[0.58rem] text-slate-400">目標販売額</span>
+                        <span className="text-[0.72rem] font-bold font-mono text-sky-300 truncate">
                           {item.sell_price.toLocaleString()}G
                         </span>
                       </div>
@@ -1004,7 +1004,7 @@ export const MobileCraftView: React.FC<MobileCraftViewProps> = React.memo(({
                     {/* 下部タップガイド */}
                     <div className="flex items-center justify-between mt-1 px-0.5 text-[0.62rem] text-slate-400">
                       <span>
-                        日販数: <strong className="text-white font-mono">{item.daily_sales_qty}</strong> 個/日
+                        原価: <strong className="text-emerald-400 font-mono">{item.craft_cost.toLocaleString()}G</strong> (日販: <strong className="text-white font-mono">{item.daily_sales_qty}</strong>個)
                       </span>
                       <span className="text-emerald-400 font-bold flex items-center gap-1">
                         製作手順を見る <i className="fa-solid fa-arrow-right text-[0.6rem]"></i>

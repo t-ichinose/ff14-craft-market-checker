@@ -62,6 +62,7 @@ export interface CraftCardItem {
   amt: number;
   batch_cost: number;
   sell_price: number;
+  max_buy_price?: number;
   craft_cost: number;
   profit: number;
   profit_rate: number;

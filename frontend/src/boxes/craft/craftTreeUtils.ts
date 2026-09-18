@@ -264,7 +264,8 @@ export function resolveFullTreeForScope(
  */
 export function calculateTreeLayout(
   selectedItem: CraftCardItem,
-  tree: RecipeTreeItem[]
+  tree: RecipeTreeItem[],
+  multiplier: number = 1
 ): { nodes: CanvasNode[]; edges: CanvasEdge[] } {
   const nodes: CanvasNode[] = [];
   const edges: CanvasEdge[] = [];
@@ -374,6 +375,7 @@ export function calculateTreeLayout(
   rootNode.y = Math.max(40, 40 + (totalL1Height - rootNode.height) / 2);
   nodes.push(rootNode);
 
+  const safeMult = Math.max(1, multiplier || 1);
   let currentLevel1Y = 40;
   if (tree && tree.length > 0) {
     tree.forEach((l1Item, idx) => {
@@ -384,7 +386,7 @@ export function calculateTreeLayout(
         rootNode.x + rootNode.width,
         rootNode.y + rootNode.height / 2,
         1,
-        1,
+        safeMult,
         currentLevel1Y,
         idx
       );
@@ -495,7 +497,60 @@ export function getRobustItemPrice(it?: {
 }
 
 /**
- * 出品データが存在する場合はクリーンな出品最安値を優先、なければ履歴相場にフォールバック
+ * 出品データ（最大20件）から中央値を特定し、中央値の2倍（+100%）を超える高額出品や
+ * 極端な捨て値を除外した適正出品の加重平均単価（まとめ買い基準価格）を算出
+ */
+export function extractCleanProcurementPrice(
+  rawTuples: RawListingTuple[] | undefined,
+  isHq: boolean,
+  _benchmarkPrice?: number
+): number | null {
+  if (!rawTuples || rawTuples.length === 0) return null;
+
+  // 1. 指定品質（HQ/NQ）の有効な出品を抽出
+  const filtered: { price: number; quantity: number }[] = [];
+  for (let i = 0; i < rawTuples.length; i++) {
+    const [price, qty, hqFlag] = rawTuples[i];
+    if (Boolean(hqFlag) === isHq && price > 0 && qty > 0) {
+      filtered.push({ price, quantity: qty });
+    }
+  }
+  if (filtered.length === 0) return null;
+
+  // 2. 価格昇順ソート
+  filtered.sort((a, b) => a.price - b.price);
+
+  // 3. なんのフィルターもかけていない状態の全件データから「中央値（Median）」を特定
+  const midIdx = Math.floor(filtered.length / 2);
+  const medianPrice = filtered.length % 2 === 0
+    ? Math.round((filtered[midIdx - 1].price + filtered[midIdx].price) / 2)
+    : filtered[midIdx].price;
+
+  if (medianPrice <= 0) return null;
+
+  // 4. 中央値を基準にした許容フィルター
+  // - 上限: 最大100%（2倍）まで許容。2倍を超えるボッタクリ・倉庫代わりの出品を除外
+  // - 下限: 10G未満の捨て値、および中央値の30%未満（桁ミス・極端安値）を除外
+  const maxAllowedPrice = medianPrice * 2.0;
+  const minAllowedPrice = Math.max(10, Math.round(medianPrice * 0.30));
+
+  const valid = filtered.filter((f) => f.price >= minAllowedPrice && f.price <= maxAllowedPrice);
+  if (valid.length === 0) return null;
+
+  // 5. 残った適正出品全件の加重平均（総額 ÷ 総数量）
+  let totalCost = 0;
+  let totalQty = 0;
+  for (let i = 0; i < valid.length; i++) {
+    totalCost += valid[i].price * valid[i].quantity;
+    totalQty += valid[i].quantity;
+  }
+
+  if (totalQty <= 0) return null;
+  return Math.round(totalCost / totalQty);
+}
+
+/**
+ * 出品データが存在する場合は出品全件の加重平均調達価格を優先、なければ履歴相場にフォールバック
  */
 export function getMaterialPrice(
   it: any,
@@ -506,9 +561,9 @@ export function getMaterialPrice(
   if (listingsMap) {
     const rawListings = listingsMap[String(it.item_id)]?.[wname];
     const benchmark = it.region_median_price || it.avg_price || 0;
-    const cleanMin = extractCleanMinListing(rawListings, isHq, benchmark);
-    if (cleanMin && cleanMin.price > 0) {
-      return cleanMin.price;
+    const avgProcurementPrice = extractCleanProcurementPrice(rawListings, isHq, benchmark);
+    if (avgProcurementPrice && avgProcurementPrice > 0) {
+      return avgProcurementPrice;
     }
   }
   return getRobustItemPrice(it);
@@ -543,7 +598,7 @@ export function evaluateProductSellPrice(
     }
   }
   if (sellPrice <= 0) {
-    sellPrice = historyPrice || getRobustItemPrice(it);
+    sellPrice = historyPrice || it.avg_price || it.min_price || benchmark || 0;
   }
   return sellPrice;
 }
@@ -565,13 +620,19 @@ export function evaluateCardItem(
 ): CraftCardItem | null {
   if (rawSellPrice <= 0 || craftCost <= 0) return null;
 
-  // 1. 販売手数料 (5%控除後の手残り純売価)
+  // 1. 金策タブと完全一致: 目標販売額から逆算した「目標仕入上限額 (maxBuyPrice)」
+  // 手数料 (他鯖購入税5% + 自鯖販売税5% = 計10%) を考慮し、最低利回り15%を確保できる仕入上限
+  // netReturn = sellPrice * 0.95, netCost = buyPrice * 1.05
+  // netReturn - netCost >= netCost * 0.15  =>  buyPrice <= (sellPrice * 0.95) / (1.05 * 1.15)
+  const maxBuyPrice = Math.floor((rawSellPrice * 0.95) / (1.05 * 1.15));
+
+  // 2. 販売手数料 (5%控除後の手残り純売価)
   const netSellPrice = Math.round(rawSellPrice * 0.95);
   const profit = netSellPrice - craftCost;
   // 原価利益率 (ROI %)
   const profitRate = Math.round(((profit / craftCost) * 100) * 10) / 10;
 
-  // === 2. 堅牢なノイズフィルター (ギル移動・偽の異常利益を完全排除) ===
+  // === 3. 堅牢なノイズフィルター (ギル移動・偽の異常利益を完全排除) ===
   const isHighVelocity = velocity >= 1.0;
   const isLowValueConsumable = rawSellPrice < 30000;
 
@@ -603,6 +664,7 @@ export function evaluateCardItem(
     amt: yieldAmt,
     batch_cost: batchCost,
     sell_price: rawSellPrice,
+    max_buy_price: maxBuyPrice,
     craft_cost: craftCost,
     profit,
     profit_rate: profitRate,
@@ -621,7 +683,32 @@ export interface MaterialPriceMaps {
 }
 
 /**
+ * 候補リストからポツン半値（異常な単発安値外れ値）を除外し、真の最安値を決定するヘルパー
+ */
+function resolveRobustBestCandidate(
+  candidates: { price: number; world: string }[]
+): { price: number; world: string } | undefined {
+  if (candidates.length === 0) return undefined;
+  if (candidates.length === 1) return candidates[0];
+
+  candidates.sort((a, b) => a.price - b.price);
+
+  // ★ 金策タブと完全同一: 1位が2位の55%未満（ほぼ半値以下）なら1位をスキップ
+  let validCandidates = candidates;
+  while (
+    validCandidates.length >= 2 &&
+    validCandidates[1].price >= 1000 &&
+    validCandidates[0].price < validCandidates[1].price * 0.55
+  ) {
+    validCandidates = validCandidates.slice(1);
+  }
+
+  return validCandidates[0];
+}
+
+/**
  * 全ワールドから素材最安価格マップ（NQ/HQ/全DC）を1パスで構築する共通関数
+ * 金策タブと同じポツン半値外れ値除外フィルターを適用
  */
 export function buildMaterialPriceMaps(
   marketData: MarketDataPayload | null | undefined,
@@ -639,9 +726,6 @@ export function buildMaterialPriceMaps(
   };
   if (!marketData || !marketData.data) return emptyRes;
 
-  const allDcNqMap = new Map<number, { price: number; world: string }>();
-  const allDcHqMap = new Map<number, { price: number; world: string }>();
-
   const isAllDc = sourcingScope === 'all_dc';
   let allowedWorldsSet: Set<string> | null = null;
   if (!isAllDc) {
@@ -652,8 +736,11 @@ export function buildMaterialPriceMaps(
     }
   }
 
-  const scopedNqMap = isAllDc ? allDcNqMap : new Map<number, { price: number; world: string }>();
-  const scopedHqMap = isAllDc ? allDcHqMap : new Map<number, { price: number; world: string }>();
+  // アイテムごとの候補収集マップ: itemId -> Candidate[]
+  const allDcNqCandidates = new Map<number, { price: number; world: string }[]>();
+  const allDcHqCandidates = new Map<number, { price: number; world: string }[]>();
+  const scopedNqCandidates = new Map<number, { price: number; world: string }[]>();
+  const scopedHqCandidates = new Map<number, { price: number; world: string }[]>();
 
   const worldNames = Object.keys(marketData.data);
   for (let w = 0; w < worldNames.length; w++) {
@@ -666,22 +753,61 @@ export function buildMaterialPriceMaps(
       const p = getMaterialPrice(it, wname, it.hq, listingsMap);
       if (p <= 0) continue;
 
-      // 1. 全DCマップの更新
-      const targetAllMap = it.hq ? allDcHqMap : allDcNqMap;
-      const curAll = targetAllMap.get(it.item_id);
-      if (!curAll || p < curAll.price) {
-        targetAllMap.set(it.item_id, { price: p, world: wname });
-      }
+      const cand = { price: p, world: wname };
 
-      // 2. スコープマップの更新 (all_dc の場合は同一インスタンスなので不要)
+      // 1. 全DC候補
+      const targetAllMap = it.hq ? allDcHqCandidates : allDcNqCandidates;
+      let allList = targetAllMap.get(it.item_id);
+      if (!allList) {
+        allList = [];
+        targetAllMap.set(it.item_id, allList);
+      }
+      allList.push(cand);
+
+      // 2. スコープ内候補
       if (!isAllDc && isAllowed) {
-        const targetScopedMap = it.hq ? scopedHqMap : scopedNqMap;
-        const curScoped = targetScopedMap.get(it.item_id);
-        if (!curScoped || p < curScoped.price) {
-          targetScopedMap.set(it.item_id, { price: p, world: wname });
+        const targetScopedMap = it.hq ? scopedHqCandidates : scopedNqCandidates;
+        let scopedList = targetScopedMap.get(it.item_id);
+        if (!scopedList) {
+          scopedList = [];
+          targetScopedMap.set(it.item_id, scopedList);
         }
+        scopedList.push(cand);
       }
     }
+  }
+
+  // 候補からポツン半値を除外して最安マップを確定
+  const allDcNqMap = new Map<number, { price: number; world: string }>();
+  const allDcHqMap = new Map<number, { price: number; world: string }>();
+  const scopedNqMap = new Map<number, { price: number; world: string }>();
+  const scopedHqMap = new Map<number, { price: number; world: string }>();
+
+  for (const [id, list] of allDcNqCandidates.entries()) {
+    const best = resolveRobustBestCandidate(list);
+    if (best) allDcNqMap.set(id, best);
+  }
+  for (const [id, list] of allDcHqCandidates.entries()) {
+    const best = resolveRobustBestCandidate(list);
+    if (best) allDcHqMap.set(id, best);
+  }
+
+  if (isAllDc) {
+    return {
+      materialPriceMap: allDcNqMap,
+      materialHqPriceMap: allDcHqMap,
+      allDcPriceMap: allDcNqMap,
+      allDcHqPriceMap: allDcHqMap,
+    };
+  }
+
+  for (const [id, list] of scopedNqCandidates.entries()) {
+    const best = resolveRobustBestCandidate(list);
+    if (best) scopedNqMap.set(id, best);
+  }
+  for (const [id, list] of scopedHqCandidates.entries()) {
+    const best = resolveRobustBestCandidate(list);
+    if (best) scopedHqMap.set(id, best);
   }
 
   return {

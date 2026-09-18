@@ -16,6 +16,7 @@ export interface InteractiveNodeCanvasProps {
   onClearSelfSufficient?: () => void;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  craftCount?: number;
 }
 
 export const InteractiveNodeCanvas: React.FC<InteractiveNodeCanvasProps> = React.memo(({
@@ -31,6 +32,7 @@ export const InteractiveNodeCanvas: React.FC<InteractiveNodeCanvasProps> = React
   onClearSelfSufficient,
   isFullscreen,
   onToggleFullscreen,
+  craftCount = 1,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -50,8 +52,8 @@ export const InteractiveNodeCanvas: React.FC<InteractiveNodeCanvasProps> = React
   zoomRef.current = zoom;
 
   const { nodes, edges } = useMemo(() => {
-    return calculateTreeLayout(selectedItem, tree);
-  }, [selectedItem, tree]);
+    return calculateTreeLayout(selectedItem, tree, craftCount);
+  }, [selectedItem, tree, craftCount]);
 
   const canvasSize = useMemo(() => {
     let maxX = 800;
@@ -457,28 +459,31 @@ export const InteractiveNodeCanvas: React.FC<InteractiveNodeCanvasProps> = React
                       {/* Row 2: Price & Profit Bar */}
                       <div className="bg-black/60 rounded-md px-2 py-0.5 border border-white/5 grid grid-cols-3 gap-1 text-center items-center text-[0.62rem]">
                         <div className="flex flex-col">
-                          <span className="text-slate-400 text-[0.55rem] whitespace-nowrap">出品売値</span>
+                          <span className="text-slate-400 text-[0.55rem] whitespace-nowrap">目標売価</span>
                           <strong className="text-sky-300 font-['Outfit'] font-bold text-[0.68rem] whitespace-nowrap">{root.sell_price.toLocaleString()}G</strong>
                         </div>
                         <div className="flex flex-col border-x border-white/10">
                           <span className="text-slate-400 text-[0.55rem] whitespace-nowrap">製作原価</span>
-                          <strong className="text-purple-300 font-['Outfit'] font-bold text-[0.68rem] whitespace-nowrap">{root.craft_cost.toLocaleString()} G/以下</strong>
+                          <strong className="text-emerald-400 font-['Outfit'] font-bold text-[0.68rem] whitespace-nowrap">{root.craft_cost.toLocaleString()}G</strong>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-slate-400 text-[0.55rem] whitespace-nowrap">純利益</span>
-                          <strong className={`font-['Outfit'] font-bold text-[0.68rem] whitespace-nowrap ${root.profit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          <strong className={`font-['Outfit'] font-bold text-[0.68rem] whitespace-nowrap ${root.profit > 0 ? 'text-cyan-300' : 'text-rose-400'}`}>
                             {root.profit > 0 ? '+' : ''}{root.profit.toLocaleString()}G
                           </strong>
                         </div>
                       </div>
                     </div>
 
-                    {/* Multi-yield Banner if root.amt > 1 */}
-                    {root.amt > 1 && (
+                    {/* Multi-yield or Multi-craft Banner */}
+                    {((craftCount > 1) || root.amt > 1) && (
                       <div className="mt-1 pt-1 border-t border-cyan-500/20 bg-cyan-950/40 -mx-1 -mb-0.5 px-2 py-0.5 rounded flex items-center justify-between text-[0.58rem] text-cyan-300">
-                        <span>🔨 1回で<strong>{root.amt}個</strong>完成 (素材費: {root.batch_cost.toLocaleString()}G)</span>
+                        <span>
+                          🔨 {craftCount > 1 ? `${craftCount}回製作 ➔ 計` : ''}<strong>{(root.amt || 1) * craftCount}個</strong>完成
+                          (総素材: {((root.batch_cost || root.craft_cost) * craftCount).toLocaleString()}G)
+                        </span>
                         <span className={`font-bold ${root.profit > 0 ? 'text-emerald-300' : 'text-rose-400'}`}>
-                          利益: {(root.profit * root.amt).toLocaleString()}G
+                          総利益: {((root.profit * (root.amt || 1)) * craftCount).toLocaleString()}G
                         </span>
                       </div>
                     )}
