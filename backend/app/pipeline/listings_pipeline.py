@@ -39,8 +39,26 @@ def get_marketable_item_ids():
     for p in candidate_paths:
         if os.path.exists(p):
             with open(p, "r", encoding="utf-8") as f:
-                return [int(line.strip()) for line in f if line.strip()]
-    raise FileNotFoundError("marketable_item_ids.txt not found!")
+                ids = [int(line.strip()) for line in f if line.strip()]
+                if ids:
+                    return ids
+    
+    # Fallback: Fetch directly from Universalis API if local file doesn't exist
+    print("⚠️ data/marketable_item_ids.txt not found locally. Fetching directly from Universalis API...")
+    try:
+        with httpx.Client(timeout=20.0) as client:
+            resp = client.get("https://universalis.app/api/v2/marketable")
+            if resp.status_code == 200:
+                ids = sorted(resp.json())
+                os.makedirs("data", exist_ok=True)
+                with open("data/marketable_item_ids.txt", "w", encoding="utf-8") as f:
+                    f.write("\n".join(str(x) for x in ids))
+                print(f"✨ Fetched {len(ids):,} marketable items from Universalis and cached to data/marketable_item_ids.txt")
+                return ids
+    except Exception as e:
+        print(f"❌ Failed to fetch marketable items from Universalis: {e}")
+
+    raise FileNotFoundError("marketable_item_ids.txt not found and failed to fetch from Universalis API!")
 
 async def fetch_dc_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, sem: asyncio.Semaphore, retry_limit: int = 3):
     chunk_str = ",".join(str(x) for x in chunk)
