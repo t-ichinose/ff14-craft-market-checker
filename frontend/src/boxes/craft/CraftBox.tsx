@@ -21,6 +21,8 @@ import {
   searchCraftPlaceholders,
 } from './craftTreeUtils';
 import { InteractiveNodeCanvas } from './InteractiveNodeCanvas';
+import { useResizablePane } from '../../shared/useResizablePane';
+import { PaneSplitter } from '../../shared/PaneSplitter';
 
 const ITEMS_PER_PAGE = 40;
 
@@ -70,6 +72,9 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
 
   // Fullscreen Pan Canvas Mode
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // Left Pane Resizer Hook (drag resizer + localStorage memory)
+  const { width: leftPaneWidth, isResizing, startResizing } = useResizablePane();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -507,10 +512,23 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
   };
 
   return (
-    <div className="container" style={{ maxWidth: '1850px', margin: '0 auto', height: '100%', padding: '0.25rem 0.6rem', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
-      <div className="pc-dashboard-container" style={{ display: 'flex', gap: '1.25rem', alignItems: 'stretch', width: '100%', flex: 1, minHeight: 0, height: '100%', marginTop: 0 }}>
-        {/* LEFT PANE (Exact 1:1 Matching market.html: w: 440px, p: 0.85rem) */}
-        <div className="left-card-scroll-pane" style={{ width: '440px', flex: '0 0 440px', height: '100%', maxHeight: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '0.85rem', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(12px)' }}>
+    <div className="container" style={{ width: '100%', maxWidth: '100%', margin: '0 auto', height: '100%', padding: '0.25rem 0.6rem', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+      <div
+        className="pc-dashboard-container"
+        style={{
+          display: 'flex',
+          gap: '0.65rem',
+          alignItems: 'stretch',
+          width: '100%',
+          flex: 1,
+          minHeight: 0,
+          height: '100%',
+          marginTop: 0,
+          '--left-pane-width': `${leftPaneWidth}px`,
+        } as React.CSSProperties}
+      >
+        {/* LEFT PANE (Dynamic width with resizer) */}
+        <div className="left-card-scroll-pane" style={{ width: `${leftPaneWidth}px`, flex: `0 0 ${leftPaneWidth}px`, height: '100%', maxHeight: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '0.85rem', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(12px)' }}>
         
           {/* Header Controls (Exact 1:1 Matching Market & Arbitrage tabs) */}
           <div className="left-pane-header" style={{ flexShrink: 0, background: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '8px 10px', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -970,6 +988,15 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
             )}
           </div>
       </div>
+
+      {/* Pane Splitter (Resize Handle) */}
+      {!isFullscreen && (
+        <PaneSplitter
+          onMouseDown={startResizing}
+          isResizing={isResizing}
+          accentColor="#10b981"
+        />
+      )}
 
       {/* RIGHT PANE: Interactive Infinite Node Canvas or Empty Placeholder (Supports Fullscreen) */}
       <div

@@ -6,6 +6,8 @@ import { fetchCheapestTriad, type ListingEntry } from '../../services/universali
 import { MarketCard } from './MarketCard';
 import { MarketDetailPane } from './MarketDetailPane';
 import { filterAndSortMarketItems } from './marketUtils';
+import { useResizablePane } from '../../shared/useResizablePane';
+import { PaneSplitter } from '../../shared/PaneSplitter';
 
 export const MarketBox: React.FC = () => {
   const [selectedWorld, setSelectedWorld] = useState<string>(() => getSavedSharedWorld());
@@ -22,6 +24,9 @@ export const MarketBox: React.FC = () => {
 
   // Selected Item for Detail Monitor
   const [selectedItem, setSelectedItem] = useState<MarketItem | null>(null);
+
+  // Left Pane Resizer Hook (drag resizer + localStorage memory)
+  const { width: leftPaneWidth, isResizing, startResizing } = useResizablePane();
 
   // Detail Monitor state
   const [listingsScope, setListingsScope] = useState<'world' | 'dc' | 'all'>('world');
@@ -342,7 +347,8 @@ export const MarketBox: React.FC = () => {
     <div
       className="container"
       style={{
-        maxWidth: '1850px',
+        width: '100%',
+        maxWidth: '100%',
         margin: '0 auto',
         height: '100%',
         padding: '0.25rem 0.6rem',
@@ -355,21 +361,22 @@ export const MarketBox: React.FC = () => {
         className="pc-dashboard-container"
         style={{
           display: 'flex',
-          gap: '1.25rem',
+          gap: '0.65rem',
           alignItems: 'stretch',
           width: '100%',
           flex: 1,
           minHeight: 0,
           height: '100%',
           marginTop: 0,
-        }}
+          '--left-pane-width': `${leftPaneWidth}px`,
+        } as React.CSSProperties}
       >
-        {/* ================= LEFT PANE (440px) ================= */}
+        {/* ================= LEFT PANE (Dynamic width with resizer) ================= */}
         <div
           className="left-card-scroll-pane"
           style={{
-            width: '440px',
-            flex: '0 0 440px',
+            width: `${leftPaneWidth}px`,
+            flex: `0 0 ${leftPaneWidth}px`,
             height: '100%',
             maxHeight: '100%',
             display: 'flex',
@@ -649,6 +656,13 @@ export const MarketBox: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Pane Splitter (Resize Handle) */}
+        <PaneSplitter
+          onMouseDown={startResizing}
+          isResizing={isResizing}
+          accentColor="#00d2ff"
+        />
 
         {/* ================= RIGHT PANE: Detail Monitor ================= */}
         <MarketDetailPane

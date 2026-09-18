@@ -55,8 +55,10 @@
         height: calc(100% - 55px);
       }
       .left-card-scroll-pane {
-        width: 440px !important;
-        flex: 0 0 440px !important;
+        width: var(--left-pane-width, 440px) !important;
+        flex: 0 0 var(--left-pane-width, 440px) !important;
+        min-width: 300px;
+        max-width: 680px;
         height: 100% !important;
         max-height: 100% !important;
         display: flex !important;
@@ -197,10 +199,11 @@
     }
 
     .container {
-      max-width: 1850px;
+      width: 100%;
+      max-width: 100%;
       margin: 0 auto;
       height: 100%;
-      padding: 0.5rem 0.8rem;
+      padding: 0.35rem 0.85rem;
       display: flex;
       flex-direction: column;
       box-sizing: border-box;
