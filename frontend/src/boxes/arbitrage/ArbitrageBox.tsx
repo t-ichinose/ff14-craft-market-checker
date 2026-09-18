@@ -319,7 +319,7 @@ export const ArbitrageBox: React.FC = () => {
       >
         
         {/* ================= LEFT PANE (Dynamic width with resizer) ================= */}
-        <div className="left-card-scroll-pane" style={{ width: `${leftPaneWidth}px`, flex: `0 0 ${leftPaneWidth}px`, height: '100%', maxHeight: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '0.85rem', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(12px)' }}>
+        <div className="left-card-scroll-pane" style={{ width: `${leftPaneWidth}px`, flex: `0 0 ${leftPaneWidth}px`, height: '100%', maxHeight: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '0.85rem', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)' }}>
           
           {/* Header Controls (Exact 1:1 Matching market.html) */}
           <div className="left-pane-header" style={{ flexShrink: 0, background: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '8px 10px', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -580,7 +580,7 @@ export const ArbitrageBox: React.FC = () => {
         />
 
         {/* ================= RIGHT PANE: 2-Window Monitor ================= */}
-        <div className="pc-right-pane" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100%', maxHeight: '100%', overflow: 'hidden', background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '1.1rem 1.25rem', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(12px)' }}>
+        <div className="pc-right-pane" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100%', maxHeight: '100%', overflow: 'hidden', background: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '1.1rem 1.25rem', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)' }}>
           <ArbitrageDetailPane
             selectedOp={selectedOp}
             sourceItem={sourceItem}

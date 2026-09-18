@@ -103,12 +103,11 @@ export const MarketDetailPane: React.FC<MarketDetailPaneProps> = React.memo(({
         height: '100%',
         maxHeight: '100%',
         overflow: 'hidden',
-        background: 'rgba(15, 23, 42, 0.85)',
+        background: 'rgba(15, 23, 42, 0.95)',
         border: '1px solid rgba(255, 255, 255, 0.08)',
         borderRadius: '16px',
         padding: '1.1rem 1.25rem',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)',
-        backdropFilter: 'blur(12px)',
       }}
     >
       {selectedItem ? (

@@ -569,7 +569,7 @@ export const PipelineLineCanvas: React.FC<PipelineLineCanvasProps> = React.memo(
               {/* ステップ列 (伸縮型レスポンシブ幅: 340px〜540px) */}
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="flex-1 min-w-[340px] max-w-[540px] flex-shrink-0 flex flex-col bg-slate-900/60 border border-white/10 rounded-2xl p-3 shadow-xl backdrop-blur-sm transition-all"
+                className="flex-1 min-w-[340px] max-w-[540px] flex-shrink-0 flex flex-col bg-slate-900/95 border border-white/10 rounded-2xl p-3 shadow-xl transition-all"
               >
                 {/* 列ヘッダー */}
                 <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
@@ -672,8 +672,12 @@ export const PipelineLineCanvas: React.FC<PipelineLineCanvasProps> = React.memo(
                     return (
                       <div
                         key={item.id}
-                        onMouseEnter={() => setHoveredItemId(item.id)}
-                        onMouseLeave={() => setHoveredItemId(null)}
+                        onMouseEnter={() => {
+                          if (focusItemId !== null) setHoveredItemId(item.id);
+                        }}
+                        onMouseLeave={() => {
+                          if (focusItemId !== null) setHoveredItemId(null);
+                        }}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleCardClick(item.id, item.world, item.quality === 'hq');
@@ -1038,7 +1042,7 @@ export const PipelineLineCanvas: React.FC<PipelineLineCanvasProps> = React.memo(
         {/* 最終ステップ: 完成品カード一覧 */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="w-[420px] flex-shrink-0 flex flex-col bg-slate-900/60 border border-amber-500/30 rounded-2xl p-3 shadow-xl backdrop-blur-sm"
+          className="flex-1 min-w-[340px] max-w-[540px] flex-shrink-0 flex flex-col bg-slate-900/95 border border-amber-500/30 rounded-2xl p-3 shadow-xl transition-all"
         >
           {/* 列ヘッダー */}
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 shrink-0">

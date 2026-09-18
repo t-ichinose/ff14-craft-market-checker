@@ -528,7 +528,7 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
         } as React.CSSProperties}
       >
         {/* LEFT PANE (Dynamic width with resizer) */}
-        <div className="left-card-scroll-pane" style={{ width: `${leftPaneWidth}px`, flex: `0 0 ${leftPaneWidth}px`, height: '100%', maxHeight: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '0.85rem', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(12px)' }}>
+        <div className="left-card-scroll-pane" style={{ width: `${leftPaneWidth}px`, flex: `0 0 ${leftPaneWidth}px`, height: '100%', maxHeight: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '0.85rem', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)' }}>
         
           {/* Header Controls (Exact 1:1 Matching Market & Arbitrage tabs) */}
           <div className="left-pane-header" style={{ flexShrink: 0, background: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '8px 10px', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1002,7 +1002,7 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
       <div
         className={`pc-right-pane ${
           isFullscreen
-            ? 'fixed inset-0 z-[9999] bg-slate-950/95 flex flex-col w-screen h-screen p-3.5 backdrop-blur-xl shadow-2xl animate-fadeIn'
+            ? 'fixed inset-0 z-[9999] bg-slate-950/98 flex flex-col w-screen h-screen p-3.5 shadow-2xl animate-fadeIn'
             : ''
         }`}
         style={
@@ -1016,12 +1016,11 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
                 height: '100%',
                 maxHeight: '100%',
                 overflow: 'hidden',
-                background: 'rgba(15, 23, 42, 0.85)',
+                background: 'rgba(15, 23, 42, 0.95)',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
                 borderRadius: '16px',
                 padding: '1.1rem 1.25rem',
                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)',
-                backdropFilter: 'blur(12px)',
               }
         }
       >

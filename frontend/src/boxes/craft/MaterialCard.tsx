@@ -47,7 +47,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
       title={`クリックして相場モニターを開く (仕入先: ${targetModalWorld})`}
     >
       <div
-        className={`rounded-xl border px-2.5 py-2 transition-all shadow-lg backdrop-blur-md relative flex flex-col justify-between h-[96px] ${
+        className={`rounded-xl border px-2.5 py-2 transition-all shadow-lg relative flex flex-col justify-between h-[96px] ${
           !isActive
             ? 'bg-slate-950/85 border-slate-800 shadow-none'
             : isSelfSufficient

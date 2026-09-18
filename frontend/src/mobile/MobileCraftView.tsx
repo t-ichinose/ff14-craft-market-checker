@@ -1848,7 +1848,7 @@ export const MobileCraftView: React.FC<MobileCraftViewProps> = React.memo(({
 
               {/* 下部固定サマリーバー (Page 1 のみ表示) */}
               {currentPage === 1 && (
-                <div className="fixed bottom-0 left-0 right-0 p-2.5 bg-[#0b1120]/95 backdrop-blur-md border-t border-white/10 flex items-center justify-between z-30 shadow-2xl">
+                <div className="fixed bottom-0 left-0 right-0 p-2.5 bg-[#0b1120] border-t border-white/10 flex items-center justify-between z-30 shadow-2xl">
                   <div className="flex flex-col">
                     <div className="text-[0.62rem] text-slate-400">
                       目標仕入総額: <span className="font-bold font-mono text-slate-200">{totalProcurementCost.toLocaleString()}G</span>

@@ -100,7 +100,7 @@ export const App: React.FC = () => {
   return (
     <div className="flex flex-col h-screen w-screen bg-[#0b0f19] text-[#f8fafc] font-['Inter',sans-serif] overflow-hidden">
       {/* Universal Fixed Header (Platform Land) */}
-      <header className="flex items-center justify-between px-4 py-2 bg-[#0f172a]/95 border-b border-white/10 shrink-0 z-50 backdrop-blur-md">
+      <header className="flex items-center justify-between px-4 py-2 bg-[#0f172a] border-b border-white/10 shrink-0 z-50">
         {/* Left: Brand Logo & Title */}
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-[#00d2ff] to-[#7928ca] shadow-[0_0_15px_rgba(0,210,255,0.4)]">
@@ -160,7 +160,7 @@ export const App: React.FC = () => {
           </div>
 
           {/* Status Badge */}
-          <div className="flex items-center gap-1.5 bg-[#0f172a]/80 border border-white/10 px-2.5 py-1 rounded-[10px] text-[0.75rem] text-[#94a3b8] font-normal backdrop-blur shadow-sm">
+          <div className="flex items-center gap-1.5 bg-[#0f172a] border border-white/10 px-2.5 py-1 rounded-[10px] text-[0.75rem] text-[#94a3b8] font-normal shadow-sm">
             <span className="w-2 h-2 rounded-full bg-[#4ade80] shadow-[0_0_8px_#4ade80] animate-pulse" />
             <span className="text-[#00d2ff] font-semibold flex items-center gap-1">
               <i className="fa-regular fa-calendar-days"></i> 集計期間: {periodStr}

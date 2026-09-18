@@ -327,7 +327,7 @@ export const ItemMarketModal: React.FC<ItemMarketModalProps> = ({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[100000] flex items-center justify-center p-3 bg-black/80 backdrop-blur-md animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-[100000] flex items-center justify-center p-3 bg-black/85 animate-in fade-in duration-150 select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}

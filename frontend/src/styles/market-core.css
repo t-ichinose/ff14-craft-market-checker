@@ -24,11 +24,10 @@
       margin: 0;
       padding: 0;
       font-family: 'Inter', sans-serif;
-      background: var(--bg-dark);
+      background-color: var(--bg-dark);
       background-image: 
         radial-gradient(at 0% 0%, rgba(121, 40, 202, 0.15) 0px, transparent 50%),
         radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.12) 0px, transparent 50%);
-      background-attachment: fixed;
       color: var(--text-main);
     }
 
@@ -64,12 +63,11 @@
         display: flex !important;
         flex-direction: column !important;
         overflow: hidden !important;
-        background: rgba(15, 23, 42, 0.85);
+        background: rgba(15, 23, 42, 0.95);
         border: 1px solid var(--card-border);
         border-radius: 16px;
         padding: 0.85rem;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-        backdrop-filter: blur(12px);
       }
       .pc-dashboard-container.view-analytics #arbitrageGridWrapper,
       .pc-dashboard-container.view-analytics #arbitrageMonitorWrapper {
@@ -131,12 +129,11 @@
         height: 100% !important;
         max-height: 100% !important;
         overflow: hidden !important;
-        background: rgba(15, 23, 42, 0.85);
+        background: rgba(15, 23, 42, 0.95);
         border: 1px solid var(--card-border);
         border-radius: 16px;
         padding: 1.1rem 1.25rem;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-        backdrop-filter: blur(12px);
       }
       .pc-right-pane .history-table-container {
         max-height: none !important;
@@ -299,8 +296,7 @@
     }
 
     .arbitrage-card {
-      background: var(--card-bg);
-      backdrop-filter: blur(12px);
+      background: rgba(22, 30, 49, 0.95);
       border: 1px solid var(--card-border);
       border-radius: 14px;
       padding: 0.85rem 1rem;

@@ -299,7 +299,7 @@ export const InteractiveNodeCanvas: React.FC<InteractiveNodeCanvasProps> = React
   return (
     <div className="relative flex-1 w-full h-full overflow-hidden rounded-xl bg-slate-950/80 border border-white/10 shadow-inner select-none flex flex-col">
       {/* 統合 1行コントロールヘッダーバー */}
-      <div className="flex-shrink-0 w-full bg-slate-900/95 border-b border-white/10 px-3 py-1.5 flex items-center justify-between gap-3 z-40 backdrop-blur-md">
+      <div className="flex-shrink-0 w-full bg-slate-900 border-b border-white/10 px-3 py-1.5 flex items-center justify-between gap-3 z-40">
         {/* 左: モード切替タブ ＋ 製作回数 ＋ フォーカス表示 */}
         <div className="flex items-center gap-2.5">
           {/* モード切替タブ */}
@@ -479,7 +479,7 @@ export const InteractiveNodeCanvas: React.FC<InteractiveNodeCanvasProps> = React
 
       {/* Floating Canvas Legend (Tree View Only) */}
       {viewMode === 'tree' && (
-        <div className="absolute right-4 bottom-4 z-30 bg-slate-900/90 border border-white/15 rounded-xl px-3 py-1.5 text-[0.68rem] text-slate-300 flex items-center gap-3 backdrop-blur-md shadow-xl pointer-events-none">
+        <div className="absolute right-4 bottom-4 z-30 bg-slate-900 border border-white/15 rounded-xl px-3 py-1.5 text-[0.68rem] text-slate-300 flex items-center gap-3 shadow-xl pointer-events-none">
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(0,210,255,0.8)]"></span>
             <strong className="text-white">🌟 採用ルート（仕入れ対象）</strong>
