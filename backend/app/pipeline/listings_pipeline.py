@@ -36,6 +36,9 @@ CHUNK_SIZE_LISTINGS = 100
 CHUNK_SIZE_HISTORY = 20
 MAX_LISTINGS_PER_WORLD = 20
 
+# Universalis側でDB破損を起こしている既知の異常アイテムID (HTTP 500回避)
+KNOWN_CORRUPTED_ITEM_IDS = {12655}
+
 def get_marketable_item_ids():
     candidate_paths = [
         "data/marketable_item_ids.txt",
@@ -44,7 +47,7 @@ def get_marketable_item_ids():
     for p in candidate_paths:
         if os.path.exists(p):
             with open(p, "r", encoding="utf-8") as f:
-                ids = [int(line.strip()) for line in f if line.strip()]
+                ids = [int(line.strip()) for line in f if line.strip() and int(line.strip()) not in KNOWN_CORRUPTED_ITEM_IDS]
                 if ids:
                     return ids
     
@@ -53,7 +56,7 @@ def get_marketable_item_ids():
         with httpx.Client(timeout=20.0) as client:
             resp = client.get("https://universalis.app/api/v2/marketable")
             if resp.status_code == 200:
-                ids = sorted(resp.json())
+                ids = sorted([x for x in resp.json() if x not in KNOWN_CORRUPTED_ITEM_IDS])
                 os.makedirs("data", exist_ok=True)
                 with open("data/marketable_item_ids.txt", "w", encoding="utf-8") as f:
                     f.write("\n".join(str(x) for x in ids))
@@ -138,7 +141,7 @@ async def fetch_dc_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, s
         print(f"    ⚠️ [API Error] Skipped corrupted item {chunk[0]} on {dc_name} ({last_err})")
         return None, {}, False, last_err
 
-async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, sem: asyncio.Semaphore, retry_limit: int = 2):
+async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, sem: asyncio.Semaphore, retry_limit: int = 2, is_sub_split: bool = False):
     chunk_str = ",".join(str(x) for x in chunk)
     url = f"https://universalis.app/api/v2/history/{dc_name}/{chunk_str}?entriesWithin=604800&entriesToReturn=500"
     last_err = None
@@ -176,7 +179,6 @@ async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: li
                     await asyncio.sleep(2.0 * (attempt + 1))
                 elif resp.status_code in (502, 503, 504):
                     last_err = f"HTTP {resp.status_code} (Server Busy)"
-                    # サーバー過負荷時は少し長めに休止して負荷を逃がす
                     await asyncio.sleep(2.5 * (attempt + 1))
                 else:
                     last_err = f"HTTP {resp.status_code}"
@@ -185,11 +187,11 @@ async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: li
                 last_err = f"{type(e).__name__}"
                 await asyncio.sleep(1.0 * (attempt + 1))
 
-        # 2回失敗した場合、チャンクが15件以上あれば1回だけ半分に割って救済
-        if len(chunk) >= 15:
+        # 複数品目で失敗した場合: 半分に分割して正常品目を100%救出 (深追いは1品目まで)
+        if len(chunk) > 1:
             mid = len(chunk) // 2
-            rec1, s1, _ = await fetch_history_chunk(client, dc_name, chunk[:mid], sem, retry_limit=1)
-            rec2, s2, _ = await fetch_history_chunk(client, dc_name, chunk[mid:], sem, retry_limit=1)
+            rec1, s1, _ = await fetch_history_chunk(client, dc_name, chunk[:mid], sem, retry_limit=1, is_sub_split=True)
+            rec2, s2, _ = await fetch_history_chunk(client, dc_name, chunk[mid:], sem, retry_limit=1, is_sub_split=True)
             merged = []
             if rec1:
                 merged.extend(rec1)
@@ -197,9 +199,11 @@ async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: li
                 merged.extend(rec2)
             if s1 or s2:
                 return merged, True, None
+            return merged, False, last_err
 
-    # 一時的な不調やエラーアイテムがあってもパイプライン全体を停滞させない
-    print(f"    ⚠️ [History Warning] Skipped {len(chunk)} items on {dc_name} ({last_err})")
+    # 1品目単体まで絞り込んでも失敗したモンスターアイテム、または親タスクのみ警告を出力 (二重ログ防止)
+    if not is_sub_split or len(chunk) == 1:
+        print(f"    ⚠️ [History Warning] Skipped {len(chunk)} item(s) on {dc_name} ({last_err})")
     return [], False, last_err
 
 def init_db(conn: sqlite3.Connection):
