@@ -1,0 +1,106 @@
+name: FF14 Market Listings Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Execution mode (Item count)'
+        required: true
+        default: 'All'
+        type: choice
+        options:
+          - 'All'
+          - '200'
+          - '50'
+      concurrency:
+        description: 'Concurrency (Parallel requests)'
+        required: true
+        default: '6'
+        type: choice
+        options:
+          - '6'
+          - '8'
+          - '4'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ff14-data-pipeline
+  cancel-in-progress: false
+
+jobs:
+  run-listings-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
+
+      - name: Install dependencies
+        run: |
+          pip install httpx
+
+      - name: Download existing data assets from Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p data frontend/public
+          gh release download data-latest --repo ${{ github.repository }} --dir data/ --clobber || true
+          cp data/*.json.gz frontend/public/ 2>/dev/null || true
+          cp data/*.json frontend/public/ 2>/dev/null || true
+
+      - name: Restore / Cache SQLite Database
+        uses: actions/cache@v4
+        with:
+          path: data/ff14_craft.db
+          key: ff14-craft-db-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            ff14-craft-db-${{ runner.os }}-
+
+      - name: Run Unified Listings Pipeline
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: |
+          TEST_MODE="${{ inputs.test_mode || 'All' }}"
+          CONCURRENCY="${{ inputs.concurrency || '6' }}"
+          echo "=== Starting Unified Pipeline (Items: $TEST_MODE, Concurrency: $CONCURRENCY) ==="
+          
+          if [ "$TEST_MODE" = "All" ]; then
+            python backend/app/pipeline/listings_pipeline.py --concurrency $CONCURRENCY
+          else
+            python backend/app/pipeline/listings_pipeline.py --sample $TEST_MODE --concurrency $CONCURRENCY
+          fi
+          echo "=== Unified Pipeline Completed ==="
+
+      - name: Check Generated Data Size
+        run: |
+          ls -lh frontend/public/*.json.gz || true
+
+      - name: Upload updated assets to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view data-latest --repo ${{ github.repository }} || gh release create data-latest --title "Latest Market Data" --notes "Automated data assets for FF14 Craft Market Checker" --repo ${{ github.repository }}
+          
+          FILES=()
+          for f in frontend/public/listings.json.gz frontend/public/data.json.gz frontend/public/recipes.json frontend/public/recipes.json.gz data/items_metadata.json.gz data/marketable_item_ids.txt; do
+            if [ -f "$f" ]; then
+              FILES+=("$f")
+            fi
+          done
+          
+          if [ ${#FILES[@]} -gt 0 ]; then
+            gh release upload data-latest "${FILES[@]}" --repo ${{ github.repository }} --clobber
+            echo "✨ Successfully uploaded ${#FILES[@]} files to Release data-latest!"
+          else
+            echo "⚠️ Warning: No files found to upload to Release data-latest."
+          fi
