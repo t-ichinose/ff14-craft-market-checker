@@ -46,15 +46,21 @@ jobs:
           cd frontend
           npm ci
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          pip install httpx
+
       - name: Download latest data assets from Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p frontend/public
-          gh release download data-latest --repo ${{ github.repository }} --dir frontend/public/ --clobber || true
-          if [ ! -f "frontend/public/data.json.gz" ]; then
-            echo "⚠️ Warning: data.json.gz not found in release data-latest. Frontend might load empty dataset."
-          fi
+          python backend/app/pipeline/release_manager.py download --repo ${{ github.repository }} --tag data-latest --dir frontend/public/ --required data.json.gz
           ls -lh frontend/public/
 
       - name: Build with Vite

@@ -54,7 +54,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p data frontend/public
-          gh release download data-latest --repo ${{ github.repository }} --dir data/ --clobber || true
+          python backend/app/pipeline/release_manager.py download --repo ${{ github.repository }} --tag data-latest --dir data/ --allow-missing
           cp data/*.json.gz frontend/public/ 2>/dev/null || true
           cp data/*.json frontend/public/ 2>/dev/null || true
 
@@ -89,8 +89,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view data-latest --repo ${{ github.repository }} || gh release create data-latest --title "Latest Market Data" --notes "Automated data assets for FF14 Craft Market Checker" --repo ${{ github.repository }}
-          
           FILES=()
           for f in frontend/public/listings.json.gz frontend/public/data.json.gz frontend/public/recipes.json frontend/public/recipes.json.gz data/items_metadata.json.gz data/marketable_item_ids.txt; do
             if [ -f "$f" ]; then
@@ -99,8 +97,7 @@ jobs:
           done
           
           if [ ${#FILES[@]} -gt 0 ]; then
-            gh release upload data-latest "${FILES[@]}" --repo ${{ github.repository }} --clobber
-            echo "✨ Successfully uploaded ${#FILES[@]} files to Release data-latest!"
+            python backend/app/pipeline/release_manager.py upload --repo ${{ github.repository }} --tag data-latest --title "Latest Market Data" --notes "Automated data assets for FF14 Craft Market Checker" --files "${FILES[@]}"
           else
             echo "⚠️ Warning: No files found to upload to Release data-latest."
           fi
