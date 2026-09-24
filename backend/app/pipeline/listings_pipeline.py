@@ -141,7 +141,7 @@ async def fetch_dc_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, s
         print(f"    ⚠️ [API Error] Skipped corrupted item {chunk[0]} on {dc_name} ({last_err})")
         return None, {}, False, last_err
 
-async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, sem: asyncio.Semaphore, retry_limit: int = 2, is_sub_split: bool = False):
+async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, sem: asyncio.Semaphore, retry_limit: int = 3):
     chunk_str = ",".join(str(x) for x in chunk)
     url = f"https://universalis.app/api/v2/history/{dc_name}/{chunk_str}?entriesWithin=604800&entriesToReturn=500"
     last_err = None
@@ -149,7 +149,7 @@ async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: li
     async with sem:
         for attempt in range(retry_limit):
             try:
-                resp = await client.get(url, timeout=12.0)
+                resp = await client.get(url, timeout=20.0)
                 if resp.status_code == 200:
                     data = resp.json()
                     items_dict = data.get("items", {})
@@ -173,7 +173,7 @@ async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: li
                                 e.get("timestamp", 0),
                                 e.get("buyerName", "")
                             ))
-                    return records, True, None
+                    return records, True, None, 0
                 elif resp.status_code == 429:
                     last_err = "HTTP 429 (Rate Limit)"
                     await asyncio.sleep(2.0 * (attempt + 1))
@@ -187,24 +187,10 @@ async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: li
                 last_err = f"{type(e).__name__}"
                 await asyncio.sleep(1.0 * (attempt + 1))
 
-        # 複数品目で失敗した場合: 半分に分割して正常品目を100%救出 (深追いは1品目まで)
-        if len(chunk) > 1:
-            mid = len(chunk) // 2
-            rec1, s1, _ = await fetch_history_chunk(client, dc_name, chunk[:mid], sem, retry_limit=1, is_sub_split=True)
-            rec2, s2, _ = await fetch_history_chunk(client, dc_name, chunk[mid:], sem, retry_limit=1, is_sub_split=True)
-            merged = []
-            if rec1:
-                merged.extend(rec1)
-            if rec2:
-                merged.extend(rec2)
-            if s1 or s2:
-                return merged, True, None
-            return merged, False, last_err
-
-    # 1品目単体まで絞り込んでも失敗したモンスターアイテム、または親タスクのみ警告を出力 (二重ログ防止)
-    if not is_sub_split or len(chunk) == 1:
-        print(f"    ⚠️ [History Warning] Skipped {len(chunk)} item(s) on {dc_name} ({last_err})")
-    return [], False, last_err
+    # 3回連続失敗した場合は深追いでハングさせずスキップ (GitHub Actionsの25分タイムアウト防止)
+    skipped_count = len(chunk)
+    print(f"    ⚠️ [History Skip] Skipped {skipped_count} item(s) on {dc_name} after {retry_limit} failed attempts ({last_err})")
+    return [], False, last_err, skipped_count
 
 def init_db(conn: sqlite3.Connection):
     cursor = conn.cursor()
@@ -288,6 +274,7 @@ async def run_pipeline(sample_limit=None, concurrency=6):
     all_listings_by_item = defaultdict(lambda: defaultdict(list))
     total_listings_count = 0
     total_new_trades_count = 0
+    total_skipped_history_items = 0
     sync_state_updates = []
 
     headers = {"User-Agent": "FF14-Listings-Pipeline/2.0"}
@@ -360,25 +347,43 @@ async def run_pipeline(sample_limit=None, concurrency=6):
                 dc_sales_records = []
                 hist_failed = 0
                 completed_hist = 0
+                dc_skipped_items = 0
                 sub_hist_batch = 12
+                consecutive_failed_batches = 0
 
                 for i in range(0, total_hist_chunks, sub_hist_batch):
                     batch = hist_chunks[i:i + sub_hist_batch]
-                    tasks = [fetch_history_chunk(client, dc_name, ch, sem) for ch in batch]
+                    tasks = [fetch_history_chunk(client, dc_name, ch, sem, retry_limit=3) for ch in batch]
                     results = await asyncio.gather(*tasks)
 
-                    for recs, success, err in results:
+                    batch_has_success = False
+                    for recs, success, err, skipped in results:
                         if success and recs:
                             dc_sales_records.extend(recs)
+                            batch_has_success = True
                         elif not success:
                             hist_failed += 1
+                            dc_skipped_items += skipped
 
                     completed_hist += len(batch)
                     t_hist_now = time.time() - t_hist_start
                     pct_h = (completed_hist / total_hist_chunks) * 100
                     h_rate = completed_hist / t_hist_now if t_hist_now > 0 else 0
-                    print(f"  📥 {dc_name} History: {completed_hist}/{total_hist_chunks} ({pct_h:.0f}%) | {h_rate:.1f} req/s | Trades: {len(dc_sales_records):,} | Elapsed: {t_hist_now:.1f}s")
+                    print(f"  📥 {dc_name} History: {completed_hist}/{total_hist_chunks} ({pct_h:.0f}%) | {h_rate:.1f} req/s | Trades: {len(dc_sales_records):,} | Skipped: {dc_skipped_items} items | Elapsed: {t_hist_now:.1f}s")
 
+                    # サーキットブレーカー: 3連続バッチで全て失敗した場合はサーバー障害とみなし残りを安全にスキップ
+                    if not batch_has_success:
+                        consecutive_failed_batches += 1
+                        if consecutive_failed_batches >= 3:
+                            remaining_chunks = hist_chunks[i + sub_hist_batch:]
+                            remaining_items = sum(len(ch) for ch in remaining_chunks)
+                            dc_skipped_items += remaining_items
+                            print(f"    🚨 [Circuit Breaker] 3 consecutive history batches failed on {dc_name}. Skipping remaining {remaining_items} items to protect pipeline runtime.")
+                            break
+                    else:
+                        consecutive_failed_batches = 0
+
+                total_skipped_history_items += dc_skipped_items
                 t_hist_elapsed = time.time() - t_hist_start
                 total_new_trades_count += len(dc_sales_records)
 
@@ -389,7 +394,7 @@ async def run_pipeline(sample_limit=None, concurrency=6):
                     """, dc_sales_records)
                     conn.commit()
 
-                print(f"  ✨ {dc_name} History Merged: {len(hist_chunks)} chunks in {t_hist_elapsed:.1f}s ({len(dc_sales_records):,} trades, Failures: {hist_failed})")
+                print(f"  ✨ {dc_name} History Merged: {completed_hist}/{total_hist_chunks} chunks in {t_hist_elapsed:.1f}s ({len(dc_sales_records):,} trades, Skipped: {dc_skipped_items} items, Failures: {hist_failed})")
             else:
                 print("  ✨ History Sync: No new uploads detected (Skipped).")
 
@@ -478,6 +483,7 @@ async def run_pipeline(sample_limit=None, concurrency=6):
     print(f"  ・Current Listings: {final_db_count:,} items")
     print(f"  ・New Trades Merged: {total_new_trades_count:,} records")
     print(f"  ・Total 7-Day History in DB: {total_sales_history_count:,} records")
+    print(f"  ・Skipped History Items: {total_skipped_history_items:,} items")
     print(f"  ・All Assets Exported: listings.json.gz, data.json.gz, recipes.json")
     print("=" * 65)
 

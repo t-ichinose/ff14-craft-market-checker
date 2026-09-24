@@ -298,18 +298,20 @@ export const CraftCard: React.FC<CraftCardProps> = React.memo(({
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-            <span style={{ fontSize: '0.63rem', color: '#94a3b8' }}>目標仕入:</span>
-            <strong style={{ color: '#c084fc', fontSize: '0.78rem', fontFamily: 'Outfit, sans-serif' }}>
-              {item.max_buy_price ? `${item.max_buy_price.toLocaleString()}G以下` : `${item.craft_cost.toLocaleString()}G以下`}
+            <span style={{ fontSize: '0.63rem', color: '#94a3b8' }}>目標原価:</span>
+            <strong style={{ color: '#10b981', fontSize: '0.78rem', fontFamily: 'Outfit, sans-serif' }}>
+              {item.craft_cost.toLocaleString()}G
             </strong>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: '0.60rem', color: '#64748b' }}>
-              原価: <strong style={{ color: item.craft_cost <= (item.max_buy_price || item.craft_cost) ? '#10b981' : '#f87171', fontFamily: 'Outfit, sans-serif' }}>{item.craft_cost.toLocaleString()}G</strong>
+              {item.amt > 1 ? '総素材費:' : '素材原価:'} <strong style={{ color: '#94a3b8', fontFamily: 'Outfit, sans-serif' }}>{item.batch_cost.toLocaleString()}G</strong>
             </span>
-            <span style={{ color: '#64748b', fontSize: '0.58rem', fontFamily: 'Outfit, sans-serif' }}>
-              (総素材: {item.batch_cost.toLocaleString()}G)
-            </span>
+            {item.amt > 1 && (
+              <span style={{ color: '#34d399', fontSize: '0.58rem', fontFamily: 'Outfit, sans-serif' }}>
+                (@{item.craft_cost.toLocaleString()}G)
+              </span>
+            )}
           </div>
         </div>
 

@@ -787,6 +787,13 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', textAlign: 'right' }}>
                     <div>
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>合算目標原価:</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#10b981', fontFamily: 'Outfit, sans-serif' }}>
+                        {enrichedTargets.reduce((sum, t) => sum + (t.item.batch_cost || 0) * t.craftCount, 0).toLocaleString()} <span style={{ fontSize: '0.72rem', color: '#10b981' }}>G</span>
+                      </div>
+                    </div>
+                    <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.1)' }}></div>
+                    <div>
                       <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>合算日当利益:</div>
                       <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffb703', fontFamily: 'Outfit, sans-serif' }}>
                         {enrichedTargets.reduce((sum, t) => sum + (t.item.daily_profit || 0), 0).toLocaleString()} <span style={{ fontSize: '0.72rem', color: '#ffb703' }}>G/日</span>
@@ -888,6 +895,15 @@ export const CraftBox: React.FC<CraftPlannerViewProps> = ({
                 {/* Right: Metrics + Lodestone Button */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', textAlign: 'right' }}>
+                    <div>
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+                        目標原価{effectiveItem.amt > 1 ? ' (単価)' : ''}:
+                      </div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#10b981', fontFamily: 'Outfit, sans-serif' }}>
+                        {effectiveItem.craft_cost.toLocaleString()} <span style={{ fontSize: '0.72rem', color: '#10b981' }}>G</span>
+                      </div>
+                    </div>
+                    <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.1)' }}></div>
                     <div>
                       <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>日当利益:</div>
                       <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffb703', fontFamily: 'Outfit, sans-serif' }}>

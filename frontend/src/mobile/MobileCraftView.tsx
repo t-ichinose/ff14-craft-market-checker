@@ -566,7 +566,7 @@ export const MobileCraftView: React.FC<MobileCraftViewProps> = React.memo(({
   // 選択アイテムの製作サマリー（合計仕入、合計売価、合計利益）
   const totalCraftCost = useMemo(() => {
     const item = activeSelectedItem || selectedItem;
-    return item ? item.craft_cost * craftCount : 0;
+    return item ? (item.batch_cost || item.craft_cost) * craftCount : 0;
   }, [activeSelectedItem, selectedItem, craftCount]);
 
   const totalSellPrice = useMemo(() => {
@@ -985,9 +985,9 @@ export const MobileCraftView: React.FC<MobileCraftViewProps> = React.memo(({
                         </span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[0.58rem] text-slate-400">目標仕入額</span>
-                        <span className="text-[0.72rem] font-bold font-mono text-purple-300 truncate">
-                          {item.max_buy_price ? `${item.max_buy_price.toLocaleString()}G以下` : `${item.craft_cost.toLocaleString()}G`}
+                        <span className="text-[0.58rem] text-slate-400">目標原価</span>
+                        <span className="text-[0.72rem] font-bold font-mono text-emerald-400 truncate">
+                          {item.craft_cost.toLocaleString()}G
                         </span>
                       </div>
                       <div className="flex flex-col">
@@ -1001,7 +1001,7 @@ export const MobileCraftView: React.FC<MobileCraftViewProps> = React.memo(({
                     {/* 下部タップガイド */}
                     <div className="flex items-center justify-between mt-1 px-0.5 text-[0.62rem] text-slate-400">
                       <span>
-                        原価: <strong className="text-emerald-400 font-mono">{item.craft_cost.toLocaleString()}G</strong> (日販: <strong className="text-white font-mono">{item.daily_sales_qty}</strong>個)
+                        {item.amt > 1 ? `総素材: ${item.batch_cost.toLocaleString()}G (${item.amt}個完成)` : `原価: ${item.craft_cost.toLocaleString()}G`} (日販: <strong className="text-white font-mono">{item.daily_sales_qty}</strong>個)
                       </span>
                       <span className="text-emerald-400 font-bold flex items-center gap-1">
                         製作手順を見る <i className="fa-solid fa-arrow-right text-[0.6rem]"></i>
@@ -1152,7 +1152,14 @@ export const MobileCraftView: React.FC<MobileCraftViewProps> = React.memo(({
                       {/* 原価 / 売価 行 */}
                       <div className="flex items-center justify-between text-[0.68rem] text-slate-400 pt-1 border-t border-white/5">
                         <div className="min-w-0">
-                          目標仕入額: <span className="text-amber-300 font-bold font-mono">{totalCraftCost.toLocaleString()}G</span>
+                          目標原価: <span className="text-emerald-400 font-bold font-mono">
+                            {totalCraftCost.toLocaleString()}G
+                            {selectedItem.amt > 1 && (
+                              <span className="text-[0.6rem] text-slate-400 font-normal font-sans ml-1">
+                                (@{selectedItem.craft_cost.toLocaleString()}G)
+                              </span>
+                            )}
+                          </span>
                         </div>
                         <div className="min-w-0 text-right">
                           想定売価: <span className="text-slate-200 font-bold font-mono">{totalSellPrice.toLocaleString()}G</span>
@@ -1848,7 +1855,7 @@ export const MobileCraftView: React.FC<MobileCraftViewProps> = React.memo(({
                 <div className="fixed bottom-0 left-0 right-0 p-2.5 bg-[#0b1120] border-t border-white/10 flex items-center justify-between z-30 shadow-2xl">
                   <div className="flex flex-col">
                     <div className="text-[0.62rem] text-slate-400">
-                      目標仕入総額: <span className="font-bold font-mono text-slate-200">{totalProcurementCost.toLocaleString()}G</span>
+                      目標原価総額: <span className="font-bold font-mono text-slate-200">{totalProcurementCost.toLocaleString()}G</span>
                     </div>
                     <div className="text-xs font-black">
                       残り仕入額: <span className="text-emerald-400 font-mono">{remainingProcurementCost.toLocaleString()}G</span>

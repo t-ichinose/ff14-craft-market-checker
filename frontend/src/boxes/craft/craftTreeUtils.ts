@@ -736,11 +736,8 @@ export function evaluateCardItem(
 ): CraftCardItem | null {
   if (rawSellPrice <= 0 || craftCost <= 0) return null;
 
-  // 1. 金策タブと完全一致: 目標販売額から逆算した「目標仕入上限額 (maxBuyPrice)」
-  // 手数料 (他鯖購入税5% + 自鯖販売税5% = 計10%) を考慮し、最低利回り15%を確保できる仕入上限
-  // netReturn = sellPrice * 0.95, netCost = buyPrice * 1.05
-  // netReturn - netCost >= netCost * 0.15  =>  buyPrice <= (sellPrice * 0.95) / (1.05 * 1.15)
-  const maxBuyPrice = Math.floor((rawSellPrice * 0.95) / (1.05 * 1.15));
+  // 1. クラフト目標原価: 1個あたりの完成品原価 (1回で複数個できるものは作成数量で割った単価)
+  const targetCost = craftCost;
 
   // 2. 販売手数料 (5%控除後の手残り純売価)
   const netSellPrice = Math.round(rawSellPrice * 0.95);
@@ -780,7 +777,7 @@ export function evaluateCardItem(
     amt: yieldAmt,
     batch_cost: batchCost,
     sell_price: rawSellPrice,
-    max_buy_price: maxBuyPrice,
+    max_buy_price: targetCost,
     craft_cost: craftCost,
     profit,
     profit_rate: profitRate,
