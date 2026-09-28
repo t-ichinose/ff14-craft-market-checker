@@ -36,7 +36,7 @@ CHUNK_SIZE_LISTINGS = 100
 CHUNK_SIZE_HISTORY = 20
 MAX_LISTINGS_PER_WORLD = 20
 
-CORRUPTED_ITEMS_FILE = "data/corrupted_items.json"
+CORRUPTED_ITEMS_FILE = os.path.join(PROJECT_ROOT, "data", "corrupted_items.json")
 
 def load_corrupted_items(conn: sqlite3.Connection) -> dict:
     corrupted_by_dc = defaultdict(set)
