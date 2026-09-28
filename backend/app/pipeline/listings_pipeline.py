@@ -36,8 +36,98 @@ CHUNK_SIZE_LISTINGS = 100
 CHUNK_SIZE_HISTORY = 20
 MAX_LISTINGS_PER_WORLD = 20
 
-# Universalis側でDB破損を起こしている既知の異常アイテムID (HTTP 500回避)
-KNOWN_CORRUPTED_ITEM_IDS = {12655}
+CORRUPTED_ITEMS_FILE = "data/corrupted_items.json"
+
+def load_corrupted_items(conn: sqlite3.Connection) -> dict:
+    corrupted_by_dc = defaultdict(set)
+    if os.path.exists(CORRUPTED_ITEMS_FILE):
+        try:
+            with open(CORRUPTED_ITEMS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                for dc, ids in data.items():
+                    for x in ids:
+                        corrupted_by_dc[dc].add(int(x))
+        except Exception as e:
+            print(f"⚠️ Failed to read {CORRUPTED_ITEMS_FILE}: {e}")
+
+    try:
+        c = conn.cursor()
+        c.execute("SELECT dc_name, item_id FROM api_corrupted_items")
+        for dc, iid in c.fetchall():
+            corrupted_by_dc[dc].add(int(iid))
+
+        now = int(time.time())
+        for dc, ids in corrupted_by_dc.items():
+            for iid in ids:
+                c.execute("""
+                    INSERT OR IGNORE INTO api_corrupted_items (item_id, dc_name, detected_at, last_checked_at, error_reason)
+                    VALUES (?, ?, ?, ?, 'Initial seed or API Error')
+                """, (iid, dc, now, now))
+        conn.commit()
+    except Exception as e:
+        print(f"⚠️ Failed to sync api_corrupted_items with DB: {e}")
+
+    return corrupted_by_dc
+
+def _persist_corrupted_items_json(conn: sqlite3.Connection):
+    try:
+        c = conn.cursor()
+        c.execute("SELECT dc_name, item_id FROM api_corrupted_items ORDER BY dc_name, item_id")
+        export_dict = defaultdict(list)
+        for dc, iid in c.fetchall():
+            export_dict[dc].append(iid)
+        os.makedirs(os.path.dirname(CORRUPTED_ITEMS_FILE), exist_ok=True)
+        with open(CORRUPTED_ITEMS_FILE, "w", encoding="utf-8") as f:
+            json.dump(export_dict, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"⚠️ Failed to export {CORRUPTED_ITEMS_FILE}: {e}")
+
+def save_corrupted_item(conn: sqlite3.Connection, dc_name: str, item_id: int, reason: str):
+    now = int(time.time())
+    try:
+        c = conn.cursor()
+        c.execute("""
+            INSERT OR REPLACE INTO api_corrupted_items (item_id, dc_name, detected_at, last_checked_at, error_reason)
+            VALUES (?, ?, ?, ?, ?)
+        """, (item_id, dc_name, now, now, reason))
+        conn.commit()
+    except Exception as e:
+        print(f"⚠️ Failed to save corrupted item to DB: {e}")
+    _persist_corrupted_items_json(conn)
+
+def remove_corrupted_item(conn: sqlite3.Connection, dc_name: str, item_id: int):
+    try:
+        c = conn.cursor()
+        c.execute("DELETE FROM api_corrupted_items WHERE item_id = ? AND dc_name = ?", (item_id, dc_name))
+        conn.commit()
+    except Exception as e:
+        print(f"⚠️ Failed to delete recovered item from DB: {e}")
+    _persist_corrupted_items_json(conn)
+
+async def check_and_self_heal_corrupted_items(client: httpx.AsyncClient, conn: sqlite3.Connection, dc_name: str, corrupted_ids: set):
+    if not corrupted_ids:
+        return
+
+    recovered = []
+    for iid in list(corrupted_ids):
+        try:
+            resp = await client.get(f"https://universalis.app/api/v2/{dc_name}/{iid}?entries=0", timeout=10.0)
+            if resp.status_code == 200:
+                recovered.append(iid)
+                remove_corrupted_item(conn, dc_name, iid)
+                corrupted_ids.remove(iid)
+                print(f"    🎉 [Self-Healing] Corrupted item {iid} on {dc_name} has recovered! Restored to active tracking.")
+            else:
+                conn.execute(
+                    "UPDATE api_corrupted_items SET last_checked_at = ? WHERE item_id = ? AND dc_name = ?",
+                    (int(time.time()), iid, dc_name)
+                )
+                conn.commit()
+        except Exception:
+            pass
+
+    if corrupted_ids:
+        print(f"    🛡️ [Active Isolation] {len(corrupted_ids)} corrupted item(s) on {dc_name} isolated from batch scan: {sorted(list(corrupted_ids))}")
 
 def get_marketable_item_ids():
     candidate_paths = [
@@ -47,7 +137,7 @@ def get_marketable_item_ids():
     for p in candidate_paths:
         if os.path.exists(p):
             with open(p, "r", encoding="utf-8") as f:
-                ids = [int(line.strip()) for line in f if line.strip() and int(line.strip()) not in KNOWN_CORRUPTED_ITEM_IDS]
+                ids = [int(line.strip()) for line in f if line.strip()]
                 if ids:
                     return ids
     
@@ -56,7 +146,7 @@ def get_marketable_item_ids():
         with httpx.Client(timeout=20.0) as client:
             resp = client.get("https://universalis.app/api/v2/marketable")
             if resp.status_code == 200:
-                ids = sorted([x for x in resp.json() if x not in KNOWN_CORRUPTED_ITEM_IDS])
+                ids = sorted([x for x in resp.json()])
                 os.makedirs("data", exist_ok=True)
                 with open("data/marketable_item_ids.txt", "w", encoding="utf-8") as f:
                     f.write("\n".join(str(x) for x in ids))
@@ -67,7 +157,7 @@ def get_marketable_item_ids():
 
     raise FileNotFoundError("marketable_item_ids.txt not found and failed to fetch from Universalis API!")
 
-async def fetch_dc_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, sem: asyncio.Semaphore, retry_limit: int = 3):
+async def fetch_dc_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, sem: asyncio.Semaphore, retry_limit: int = 3, conn: sqlite3.Connection = None):
     chunk_str = ",".join(str(x) for x in chunk)
     url = f"https://universalis.app/api/v2/{dc_name}/{chunk_str}?entries=0"
     last_err = None
@@ -118,8 +208,8 @@ async def fetch_dc_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, s
 
     if len(chunk) > 1:
         mid = len(chunk) // 2
-        ext1, up1, s1, _ = await fetch_dc_chunk(client, dc_name, chunk[:mid], sem, retry_limit=1)
-        ext2, up2, s2, _ = await fetch_dc_chunk(client, dc_name, chunk[mid:], sem, retry_limit=1)
+        ext1, up1, s1, _ = await fetch_dc_chunk(client, dc_name, chunk[:mid], sem, retry_limit=1, conn=conn)
+        ext2, up2, s2, _ = await fetch_dc_chunk(client, dc_name, chunk[mid:], sem, retry_limit=1, conn=conn)
 
         merged = defaultdict(lambda: defaultdict(list))
         merged_up = {}
@@ -139,6 +229,8 @@ async def fetch_dc_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, s
         return merged, merged_up, True, None
     else:
         print(f"    ⚠️ [API Error] Skipped corrupted item {chunk[0]} on {dc_name} ({last_err})")
+        if conn:
+            save_corrupted_item(conn, dc_name, chunk[0], str(last_err))
         return None, {}, False, last_err
 
 async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, sem: asyncio.Semaphore, retry_limit: int = 3):
@@ -237,6 +329,17 @@ def init_db(conn: sqlite3.Connection):
         PRIMARY KEY (item_id, dc_name)
     );
     """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS api_corrupted_items (
+        item_id INTEGER NOT NULL,
+        dc_name VARCHAR(32) NOT NULL,
+        detected_at INTEGER NOT NULL,
+        last_checked_at INTEGER NOT NULL,
+        error_reason TEXT,
+        PRIMARY KEY (item_id, dc_name)
+    );
+    """)
     conn.commit()
 
 async def run_pipeline(sample_limit=None, concurrency=6):
@@ -268,8 +371,7 @@ async def run_pipeline(sample_limit=None, concurrency=6):
     cursor.execute("SELECT item_id, dc_name, last_upload_time FROM item_sync_state")
     known_sync_state = {(row[0], row[1]): row[2] for row in cursor.fetchall()}
 
-    chunks = [marketable_ids[i:i + CHUNK_SIZE_LISTINGS] for i in range(0, len(marketable_ids), CHUNK_SIZE_LISTINGS)]
-    total_chunks = len(chunks)
+    corrupted_by_dc = load_corrupted_items(conn)
 
     all_listings_by_item = defaultdict(lambda: defaultdict(list))
     total_listings_count = 0
@@ -289,6 +391,16 @@ async def run_pipeline(sample_limit=None, concurrency=6):
             dc_worlds = DC_WORLDS[dc_name]
             print(f"\n--- [{dc_idx}/4] {dc_name} DC ({len(dc_worlds)} worlds) ---")
 
+            # 自己修復チェック＆隔離リストの更新
+            dc_corrupted = corrupted_by_dc.get(dc_name, set())
+            if dc_corrupted:
+                await check_and_self_heal_corrupted_items(client, conn, dc_name, dc_corrupted)
+
+            # このDC用に対象アイテムをフィルタ（壊れているアイテムを最初から除外して500エラー＆無駄な分割待機を完全回避）
+            dc_marketable_ids = [iid for iid in marketable_ids if iid not in dc_corrupted]
+            dc_chunks = [dc_marketable_ids[i:i + CHUNK_SIZE_LISTINGS] for i in range(0, len(dc_marketable_ids), CHUNK_SIZE_LISTINGS)]
+            total_chunks = len(dc_chunks)
+
             # Step 1: Listings fetch + extract lastUploadTime
             completed = 0
             failed = 0
@@ -296,8 +408,8 @@ async def run_pipeline(sample_limit=None, concurrency=6):
             dc_upload_times = {}
 
             for i in range(0, total_chunks, sub_batch_size):
-                batch = chunks[i:i + sub_batch_size]
-                tasks = [fetch_dc_chunk(client, dc_name, ch, sem) for ch in batch]
+                batch = dc_chunks[i:i + sub_batch_size]
+                tasks = [fetch_dc_chunk(client, dc_name, ch, sem, conn=conn) for ch in batch]
                 results = await asyncio.gather(*tasks)
 
                 for extracted, up_times, success, err in results:
