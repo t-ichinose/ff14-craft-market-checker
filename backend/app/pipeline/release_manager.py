@@ -104,17 +104,25 @@ def download_assets(repo: str, tag: str, target_dir: str, required_files: List[s
             download_url = asset["browser_download_url"]
             dest_path = os.path.join(target_dir, name)
             
-            print(f"  ⬇️ Downloading {name} ({size:,} bytes) ...", end="", flush=True)
-            t0 = time.time()
-            with client.stream("GET", download_url) as r:
-                r.raise_for_status()
-                with open(dest_path, "wb") as f:
-                    for chunk in r.iter_bytes(chunk_size=1024 * 1024):
-                        f.write(chunk)
-            elapsed = time.time() - t0
-            actual_size = os.path.getsize(dest_path)
-            print(f" done in {elapsed:.1f}s ({actual_size:,} bytes)")
-            downloaded.add(name)
+            for dl_attempt in range(1, 4):
+                try:
+                    print(f"  ⬇️ Downloading {name} ({size:,} bytes) ...", end="", flush=True)
+                    t0 = time.time()
+                    with client.stream("GET", download_url) as r:
+                        r.raise_for_status()
+                        with open(dest_path, "wb") as f:
+                            for chunk in r.iter_bytes(chunk_size=1024 * 1024):
+                                f.write(chunk)
+                    elapsed = time.time() - t0
+                    actual_size = os.path.getsize(dest_path)
+                    print(f" done in {elapsed:.1f}s ({actual_size:,} bytes)")
+                    downloaded.add(name)
+                    break
+                except Exception as e:
+                    print(f" ⚠️ Download attempt {dl_attempt} failed: {e}")
+                    if dl_attempt == 3:
+                        raise
+                    time.sleep(2.0 * dl_attempt)
         
         if required_files:
             missing = [req for req in required_files if req not in downloaded or not os.path.exists(os.path.join(target_dir, req))]
@@ -152,57 +160,59 @@ def upload_assets(repo: str, tag: str, file_paths: List[str], title: str, notes:
             max_retries = 3
             success = False
             for attempt in range(1, max_retries + 1):
-                # 1. Fetch current assets via ID
-                current_rel = client.get(f"{GITHUB_API_BASE}/repos/{repo}/releases/{rel_id}").json()
-                existing_asset = None
-                for a in current_rel.get("assets", []):
-                    if a["name"] == filename:
-                        existing_asset = a
+                try:
+                    # 1. Fetch current assets via ID
+                    current_rel = client.get(f"{GITHUB_API_BASE}/repos/{repo}/releases/{rel_id}").json()
+                    existing_asset = None
+                    for a in current_rel.get("assets", []):
+                        if a["name"] == filename:
+                            existing_asset = a
+                            break
+
+                    # 2. Delete existing asset if present
+                    if existing_asset:
+                        asset_id = existing_asset["id"]
+                        print(f"  🗑️ Existing asset found (ID: {asset_id}). Deleting...", end="", flush=True)
+                        del_resp = client.delete(f"{GITHUB_API_BASE}/repos/{repo}/releases/assets/{asset_id}")
+                        if del_resp.status_code in (204, 200):
+                            print(" deleted.")
+                        elif del_resp.status_code == 404:
+                            print(" already deleted (404 ignored).")
+                        else:
+                            print(f" warning: delete returned HTTP {del_resp.status_code}")
+                        # Brief pause to allow storage convergence
+                        time.sleep(1.0)
+
+                    # 3. Upload new asset
+                    upload_url = f"{GITHUB_UPLOADS_BASE}/repos/{repo}/releases/{rel_id}/assets?name={filename}"
+                    content_type = "application/gzip" if filename.endswith(".gz") else ("application/json" if filename.endswith(".json") else "application/octet-stream")
+                    upload_headers = {
+                        **headers,
+                        "Content-Type": content_type,
+                        "Content-Length": str(file_size)
+                    }
+
+                    print(f"  ⬆️ Uploading {filename} (Attempt {attempt}/{max_retries})...", end="", flush=True)
+                    t0 = time.time()
+                    with open(file_path, "rb") as f:
+                        file_content = f.read()
+                    
+                    up_resp = client.post(upload_url, headers=upload_headers, content=file_content)
+                    elapsed = time.time() - t0
+
+                    if up_resp.status_code == 201:
+                        print(f" successfully uploaded in {elapsed:.1f}s!")
+                        success = True
                         break
-
-                # 2. Delete existing asset if present
-                if existing_asset:
-                    asset_id = existing_asset["id"]
-                    print(f"  🗑️ Existing asset found (ID: {asset_id}). Deleting...", end="", flush=True)
-                    del_resp = client.delete(f"{GITHUB_API_BASE}/repos/{repo}/releases/assets/{asset_id}")
-                    if del_resp.status_code in (204, 200):
-                        print(" deleted.")
-                    elif del_resp.status_code == 404:
-                        print(" already deleted (404 ignored).")
+                    elif up_resp.status_code == 422:
+                        print(f" ⚠️ Conflict (HTTP 422: already exists). Retrying deletion...")
+                        time.sleep(2.0)
                     else:
-                        print(f" warning: delete returned HTTP {del_resp.status_code}")
-                    # Brief pause to allow storage convergence
-                    time.sleep(1.0)
-
-                # 3. Upload new asset
-                upload_url = f"{GITHUB_UPLOADS_BASE}/repos/{repo}/releases/{rel_id}/assets?name={filename}"
-                content_type = "application/gzip" if filename.endswith(".gz") else ("application/json" if filename.endswith(".json") else "application/octet-stream")
-                upload_headers = {
-                    **headers,
-                    "Content-Type": content_type,
-                    "Content-Length": str(file_size)
-                }
-
-                print(f"  ⬆️ Uploading {filename} (Attempt {attempt}/{max_retries})...", end="", flush=True)
-                t0 = time.time()
-                with open(file_path, "rb") as f:
-                    file_content = f.read()
-                
-                up_resp = client.post(upload_url, headers=upload_headers, content=file_content)
-                elapsed = time.time() - t0
-
-                if up_resp.status_code == 201:
-                    print(f" successfully uploaded in {elapsed:.1f}s!")
-                    success = True
-                    break
-                elif up_resp.status_code == 422:
-                    print(f" ⚠️ Conflict (HTTP 422: already exists). Retrying deletion...")
-                    time.sleep(2.0)
-                else:
-                    print(f" ❌ Failed with HTTP {up_resp.status_code}: {up_resp.text}")
-                    if attempt == max_retries:
-                        up_resp.raise_for_status()
-                    time.sleep(2.0)
+                        print(f" ❌ Failed with HTTP {up_resp.status_code}: {up_resp.text}")
+                        time.sleep(2.0)
+                except Exception as e:
+                    print(f" ⚠️ Network/API error during upload attempt {attempt}: {e}")
+                    time.sleep(2.0 * attempt)
 
             if not success:
                 raise RuntimeError(f"Failed to upload {filename} after {max_retries} attempts.")
