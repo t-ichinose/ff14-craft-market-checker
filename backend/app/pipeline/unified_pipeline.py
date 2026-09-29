@@ -362,30 +362,41 @@ def export_recipes_json(conn, meta_dict=None):
         t_end = time.time() - t_start
         print(f"✨ recipes.json ({len(json_bytes)/1024:.1f} KB, gz: {len(gz_bytes)/1024:.1f} KB) exported in {t_end:.2f}s!\n")
     else:
-        # DB に recipes テーブルがない場合は既存の recipes.json を同期・利用
-        src_path = None
+        # DB に recipes テーブルがない場合は既存の recipes.json / recipes.json.gz を同期・利用
+        src_content = None
+        src_source = None
+
         for p in ["data/recipes.json", "frontend/public/recipes.json"]:
             if os.path.exists(p) and os.path.getsize(p) > 0:
-                src_path = p
+                with open(p, "rb") as f:
+                    src_content = f.read()
+                src_source = p
                 break
-        
-        if src_path:
-            with open(src_path, "rb") as f:
-                content = f.read()
-            gz_content = gzip.compress(content, compresslevel=6)
+
+        if not src_content:
+            for p in ["data/recipes.json.gz", "frontend/public/recipes.json.gz"]:
+                if os.path.exists(p) and os.path.getsize(p) > 0:
+                    try:
+                        with open(p, "rb") as f:
+                            src_content = gzip.decompress(f.read())
+                        src_source = f"{p} (decompressed)"
+                        break
+                    except Exception as e:
+                        print(f"⚠️ Failed to decompress {p}: {e}")
+
+        if src_content:
+            gz_content = gzip.compress(src_content, compresslevel=6)
             for target in ["frontend/public/recipes.json", "data/recipes.json"]:
-                if not os.path.exists(target) or os.path.getsize(target) == 0:
-                    os.makedirs(os.path.dirname(target), exist_ok=True)
-                    with open(target, "wb") as f:
-                        f.write(content)
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with open(target, "wb") as f:
+                    f.write(src_content)
             for gz_target in ["frontend/public/recipes.json.gz", "data/recipes.json.gz"]:
-                if not os.path.exists(gz_target) or os.path.getsize(gz_target) == 0:
-                    os.makedirs(os.path.dirname(gz_target), exist_ok=True)
-                    with open(gz_target, "wb") as f:
-                        f.write(gz_content)
-            print(f"✨ `recipes` table not in DB; safely used existing {src_path} ({len(content)/1024:.1f} KB).\n")
+                os.makedirs(os.path.dirname(gz_target), exist_ok=True)
+                with open(gz_target, "wb") as f:
+                    f.write(gz_content)
+            print(f"✨ `recipes` table not in DB; safely used existing {src_source} ({len(src_content)/1024:.1f} KB).\n")
         else:
-            print("⚠️ Notice: No recipes table or recipes.json found; skipping recipe sync.\n")
+            print("⚠️ Notice: No recipes table or recipes.json(.gz) found; skipping recipe sync.\n")
 
 async def auto_sync_new_items_and_recipes(conn: sqlite3.Connection, marketable_ids: list):
     """

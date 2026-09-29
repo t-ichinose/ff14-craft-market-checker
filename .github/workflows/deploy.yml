@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: 'pages'
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -61,6 +61,11 @@ jobs:
         run: |
           mkdir -p frontend/public
           python backend/app/pipeline/release_manager.py download --repo ${{ github.repository }} --tag data-latest --dir frontend/public/ --required data.json.gz
+          # Fallback: decompress recipes.json.gz if recipes.json is missing
+          if [ ! -f frontend/public/recipes.json ] && [ -f frontend/public/recipes.json.gz ]; then
+            echo "Decompressing frontend/public/recipes.json.gz..."
+            gzip -dc frontend/public/recipes.json.gz > frontend/public/recipes.json
+          fi
           ls -lh frontend/public/
 
       - name: Build with Vite
