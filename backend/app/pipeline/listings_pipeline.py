@@ -35,9 +35,12 @@ OUTPUT_LISTINGS_DATA_DIR_GZ = "data/listings.json.gz"
 
 CHUNK_SIZE_LISTINGS = 100
 CHUNK_SIZE_HISTORY = 10  # 10アイテムに絞ることでUniversalisの504(Server Busy)を根本防止
-HISTORY_ENTRIES_TO_RETURN = 100
+HISTORY_ENTRIES_TO_RETURN = 300  # ピーク時間帯の取りこぼしを防ぐため直近300件を確保
 MAX_LISTINGS_PER_WORLD = 20
 MAX_HISTORY_SECONDS = 600  # 履歴取得に最大10分のタイムバジェットを設定 (25分タイムアウト防止)
+
+# シャード・クリスタル・クラスター類 (ID 2〜19): 全32ワールドの合算取引数が天文学的になるため、1品目単独でフェッチ
+EXTREME_VOLUME_ITEM_IDS = set(range(2, 20))
 
 CORRUPTED_ITEMS_FILE = os.path.join(PROJECT_ROOT, "data", "corrupted_items.json")
 
@@ -477,7 +480,18 @@ async def run_pipeline(sample_limit=None, concurrency=6):
 
         # Step 3: Incremental 7-Day History Fetch for diff items
         if items_needing_history:
-            hist_chunks = [items_needing_history[i:i + CHUNK_SIZE_HISTORY] for i in range(0, len(items_needing_history), CHUNK_SIZE_HISTORY)]
+            # 超高頻度品目（シャード・クリスタル類: ID 2〜19）は単独チャンクに分離して504を完全回避
+            extreme_items = [iid for iid in items_needing_history if iid in EXTREME_VOLUME_ITEM_IDS]
+            normal_items = [iid for iid in items_needing_history if iid not in EXTREME_VOLUME_ITEM_IDS]
+
+            hist_chunks = []
+            # 1. シャード類は1品目ずつの単独チャンク
+            for iid in extreme_items:
+                hist_chunks.append([iid])
+            # 2. 通常アイテムは CHUNK_SIZE_HISTORY (10品目) ずつ
+            for i in range(0, len(normal_items), CHUNK_SIZE_HISTORY):
+                hist_chunks.append(normal_items[i:i + CHUNK_SIZE_HISTORY])
+
             total_hist_chunks = len(hist_chunks)
             t_hist_start = time.time()
             japan_sales_records = []
@@ -486,7 +500,7 @@ async def run_pipeline(sample_limit=None, concurrency=6):
             sub_hist_batch = 6
 
             for i in range(0, total_hist_chunks, sub_hist_batch):
-                # タイムバジェット判定 (5分 = 300秒)
+                # タイムバジェット判定 (10分 = 600秒)
                 t_hist_check = time.time() - t_hist_start
                 if t_hist_check > MAX_HISTORY_SECONDS:
                     rem_chunks = hist_chunks[i:]
@@ -496,7 +510,7 @@ async def run_pipeline(sample_limit=None, concurrency=6):
                     break
 
                 batch = hist_chunks[i:i + sub_hist_batch]
-                tasks = [fetch_history_chunk(client, "Japan", ch, sem, retry_limit=1) for ch in batch]
+                tasks = [fetch_history_chunk(client, "Japan", ch, sem, retry_limit=2) for ch in batch]
                 results = await asyncio.gather(*tasks)
 
                 for recs, success, err, skipped in results:
