@@ -34,10 +34,10 @@ OUTPUT_LISTINGS_GZ_PATH = "frontend/public/listings.json.gz"
 OUTPUT_LISTINGS_DATA_DIR_GZ = "data/listings.json.gz"
 
 CHUNK_SIZE_LISTINGS = 100
-CHUNK_SIZE_HISTORY = 20
+CHUNK_SIZE_HISTORY = 10  # 10アイテムに絞ることでUniversalisの504(Server Busy)を根本防止
 HISTORY_ENTRIES_TO_RETURN = 100
 MAX_LISTINGS_PER_WORLD = 20
-MAX_HISTORY_SECONDS = 300  # 履歴取得に最大5分のタイムバジェットを設定 (25分タイムアウト防止)
+MAX_HISTORY_SECONDS = 600  # 履歴取得に最大10分のタイムバジェットを設定 (25分タイムアウト防止)
 
 CORRUPTED_ITEMS_FILE = os.path.join(PROJECT_ROOT, "data", "corrupted_items.json")
 
@@ -241,7 +241,7 @@ async def fetch_history_chunk(
     dc_name: str,
     chunk: list,
     sem: asyncio.Semaphore,
-    retry_limit: int = 1,
+    retry_limit: int = 2,
     entries_to_return: int = HISTORY_ENTRIES_TO_RETURN
 ):
     chunk_str = ",".join(str(x) for x in chunk)
@@ -251,8 +251,7 @@ async def fetch_history_chunk(
     async with sem:
         for attempt in range(retry_limit + 1):
             try:
-                # Universalisの504/負荷過多は約5秒で返るため、タイムアウトは7.0秒で素早く検知
-                resp = await client.get(url, timeout=7.0)
+                resp = await client.get(url, timeout=8.0)
                 if resp.status_code == 200:
                     data = resp.json()
                     items_dict = data.get("items", {})
@@ -281,28 +280,26 @@ async def fetch_history_chunk(
                     return records, True, None, 0
                 elif resp.status_code == 429:
                     last_err = "HTTP 429 (Rate Limit)"
-                    await asyncio.sleep(1.5 * (attempt + 1))
+                    await asyncio.sleep(2.0 * (attempt + 1))
                 elif resp.status_code in (502, 503, 504):
                     last_err = f"HTTP {resp.status_code} (Server Busy)"
-                    await asyncio.sleep(1.0 * (attempt + 1))
+                    await asyncio.sleep(2.0 * (attempt + 1))
                 else:
                     last_err = f"HTTP {resp.status_code}"
-                    await asyncio.sleep(0.5 * (attempt + 1))
+                    await asyncio.sleep(1.0 * (attempt + 1))
             except Exception as e:
                 last_err = f"{type(e).__name__}"
-                await asyncio.sleep(0.5 * (attempt + 1))
+                await asyncio.sleep(1.0 * (attempt + 1))
 
     # Smart Split: 複数アイテムまとめで504等の場合は半分に分割して正常アイテムを救済
     if len(chunk) > 1:
         mid = len(chunk) // 2
-        rec1, s1, _, sk1 = await fetch_history_chunk(client, dc_name, chunk[:mid], sem, retry_limit=0, entries_to_return=entries_to_return)
-        rec2, s2, _, sk2 = await fetch_history_chunk(client, dc_name, chunk[mid:], sem, retry_limit=0, entries_to_return=entries_to_return)
+        rec1, s1, _, sk1 = await fetch_history_chunk(client, dc_name, chunk[:mid], sem, retry_limit=1, entries_to_return=entries_to_return)
+        rec2, s2, _, sk2 = await fetch_history_chunk(client, dc_name, chunk[mid:], sem, retry_limit=1, entries_to_return=entries_to_return)
         return (rec1 + rec2), (s1 or s2), last_err, (sk1 + sk2)
     elif entries_to_return > 20:
         # 単一アイテムで504（シャード等の超大量取引アイテム）の場合、直近20件に絞って再試行
-        rec, s, _, sk = await fetch_history_chunk(client, dc_name, chunk, sem, retry_limit=0, entries_to_return=20)
-        if s:
-            return rec, True, None, 0
+        return await fetch_history_chunk(client, dc_name, chunk, sem, retry_limit=1, entries_to_return=20)
 
     # 完全に失敗したアイテムのみスキップ
     skipped_count = len(chunk)
@@ -472,11 +469,11 @@ async def run_pipeline(sample_limit=None, concurrency=6):
         pct_diff = (len(items_needing_history) / len(marketable_ids)) * 100.0 if marketable_ids else 0
         print(f"  🔍 Diff Detected: {len(items_needing_history):,}/{len(marketable_ids):,} items had new uploads ({pct_diff:.1f}%)")
 
-        # 雪だるま防止安全弁: 長期停止からの復旧時など差分が膨大な場合は、直近で動いた2,500件を優先取得してタイムアウトを防止
-        if len(items_needing_history) > 2500:
-            print(f"  ⚠️ Large diff detected ({len(items_needing_history):,} items). Prioritizing top 2,500 most recently updated items for this run.")
+        # 雪だるま防止安全弁: 長期停止からの復旧時など差分が膨大な場合は、直近で動いた5,000件を優先取得してタイムアウトを防止
+        if len(items_needing_history) > 5000:
+            print(f"  ⚠️ Large diff detected ({len(items_needing_history):,} items). Prioritizing top 5,000 most recently updated items for this run.")
             items_needing_history.sort(key=lambda x: japan_upload_times.get(x, 0), reverse=True)
-            items_needing_history = items_needing_history[:2500]
+            items_needing_history = items_needing_history[:5000]
 
         # Step 3: Incremental 7-Day History Fetch for diff items
         if items_needing_history:
@@ -486,7 +483,7 @@ async def run_pipeline(sample_limit=None, concurrency=6):
             japan_sales_records = []
             hist_failed = 0
             completed_hist = 0
-            sub_hist_batch = 8
+            sub_hist_batch = 6
 
             for i in range(0, total_hist_chunks, sub_hist_batch):
                 # タイムバジェット判定 (5分 = 300秒)
