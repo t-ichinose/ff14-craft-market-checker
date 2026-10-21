@@ -19,7 +19,8 @@ if PROJECT_ROOT not in sys.path:
 from backend.app.constants import (
     JAPAN_DC_NAMES as JAPAN_DCS,
     DC_WORLDS,
-    WORLD_TO_DC
+    WORLD_TO_DC,
+    ALL_JAPAN_WORLDS
 )
 from backend.app.pipeline.unified_pipeline import (
     get_items_metadata,
@@ -34,7 +35,9 @@ OUTPUT_LISTINGS_DATA_DIR_GZ = "data/listings.json.gz"
 
 CHUNK_SIZE_LISTINGS = 100
 CHUNK_SIZE_HISTORY = 20
+HISTORY_ENTRIES_TO_RETURN = 100
 MAX_LISTINGS_PER_WORLD = 20
+MAX_HISTORY_SECONDS = 300  # 履歴取得に最大5分のタイムバジェットを設定 (25分タイムアウト防止)
 
 CORRUPTED_ITEMS_FILE = os.path.join(PROJECT_ROOT, "data", "corrupted_items.json")
 
@@ -161,7 +164,7 @@ async def fetch_dc_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, s
     chunk_str = ",".join(str(x) for x in chunk)
     url = f"https://universalis.app/api/v2/{dc_name}/{chunk_str}?entries=0"
     last_err = None
-    target_worlds = set(DC_WORLDS.get(dc_name, []))
+    target_worlds = set(ALL_JAPAN_WORLDS) if dc_name == "Japan" else set(DC_WORLDS.get(dc_name, []))
 
     async with sem:
         for attempt in range(retry_limit):
@@ -233,15 +236,23 @@ async def fetch_dc_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, s
             save_corrupted_item(conn, dc_name, chunk[0], str(last_err))
         return None, {}, False, last_err
 
-async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, sem: asyncio.Semaphore, retry_limit: int = 3):
+async def fetch_history_chunk(
+    client: httpx.AsyncClient,
+    dc_name: str,
+    chunk: list,
+    sem: asyncio.Semaphore,
+    retry_limit: int = 1,
+    entries_to_return: int = HISTORY_ENTRIES_TO_RETURN
+):
     chunk_str = ",".join(str(x) for x in chunk)
-    url = f"https://universalis.app/api/v2/history/{dc_name}/{chunk_str}?entriesWithin=604800&entriesToReturn=500"
+    url = f"https://universalis.app/api/v2/history/{dc_name}/{chunk_str}?entriesWithin=604800&entriesToReturn={entries_to_return}"
     last_err = None
 
     async with sem:
-        for attempt in range(retry_limit):
+        for attempt in range(retry_limit + 1):
             try:
-                resp = await client.get(url, timeout=20.0)
+                # Universalisの504/負荷過多は約5秒で返るため、タイムアウトは7.0秒で素早く検知
+                resp = await client.get(url, timeout=7.0)
                 if resp.status_code == 200:
                     data = resp.json()
                     items_dict = data.get("items", {})
@@ -255,10 +266,12 @@ async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: li
                         except (ValueError, TypeError):
                             continue
                         for e in item_data.get("entries", []):
+                            w = e.get("worldName", "")
+                            item_dc = WORLD_TO_DC.get(w, dc_name)
                             records.append((
                                 iid,
-                                dc_name,
-                                e.get("worldName", ""),
+                                item_dc,
+                                w,
                                 1 if e.get("hq") else 0,
                                 e.get("pricePerUnit", 0),
                                 e.get("quantity", 0),
@@ -268,20 +281,32 @@ async def fetch_history_chunk(client: httpx.AsyncClient, dc_name: str, chunk: li
                     return records, True, None, 0
                 elif resp.status_code == 429:
                     last_err = "HTTP 429 (Rate Limit)"
-                    await asyncio.sleep(2.0 * (attempt + 1))
+                    await asyncio.sleep(1.5 * (attempt + 1))
                 elif resp.status_code in (502, 503, 504):
                     last_err = f"HTTP {resp.status_code} (Server Busy)"
-                    await asyncio.sleep(2.5 * (attempt + 1))
+                    await asyncio.sleep(1.0 * (attempt + 1))
                 else:
                     last_err = f"HTTP {resp.status_code}"
-                    await asyncio.sleep(1.0 * (attempt + 1))
+                    await asyncio.sleep(0.5 * (attempt + 1))
             except Exception as e:
                 last_err = f"{type(e).__name__}"
-                await asyncio.sleep(1.0 * (attempt + 1))
+                await asyncio.sleep(0.5 * (attempt + 1))
 
-    # 3回連続失敗した場合は深追いでハングさせずスキップ (GitHub Actionsの25分タイムアウト防止)
+    # Smart Split: 複数アイテムまとめで504等の場合は半分に分割して正常アイテムを救済
+    if len(chunk) > 1:
+        mid = len(chunk) // 2
+        rec1, s1, _, sk1 = await fetch_history_chunk(client, dc_name, chunk[:mid], sem, retry_limit=0, entries_to_return=entries_to_return)
+        rec2, s2, _, sk2 = await fetch_history_chunk(client, dc_name, chunk[mid:], sem, retry_limit=0, entries_to_return=entries_to_return)
+        return (rec1 + rec2), (s1 or s2), last_err, (sk1 + sk2)
+    elif entries_to_return > 20:
+        # 単一アイテムで504（シャード等の超大量取引アイテム）の場合、直近20件に絞って再試行
+        rec, s, _, sk = await fetch_history_chunk(client, dc_name, chunk, sem, retry_limit=0, entries_to_return=20)
+        if s:
+            return rec, True, None, 0
+
+    # 完全に失敗したアイテムのみスキップ
     skipped_count = len(chunk)
-    print(f"    ⚠️ [History Skip] Skipped {skipped_count} item(s) on {dc_name} after {retry_limit} failed attempts ({last_err})")
+    print(f"    ⚠️ [History Skip] Skipped item {chunk[0]} on {dc_name} ({last_err})")
     return [], False, last_err, skipped_count
 
 def init_db(conn: sqlite3.Connection):
@@ -368,8 +393,8 @@ async def run_pipeline(sample_limit=None, concurrency=6):
     await auto_sync_new_items_and_recipes(conn, marketable_ids)
 
     cursor = conn.cursor()
-    cursor.execute("SELECT item_id, dc_name, last_upload_time FROM item_sync_state")
-    known_sync_state = {(row[0], row[1]): row[2] for row in cursor.fetchall()}
+    cursor.execute("SELECT item_id, last_upload_time FROM item_sync_state WHERE dc_name = 'Japan' OR dc_name = 'Elemental'")
+    known_sync_state = {row[0]: row[1] for row in cursor.fetchall()}
 
     corrupted_by_dc = load_corrupted_items(conn)
 
@@ -377,150 +402,144 @@ async def run_pipeline(sample_limit=None, concurrency=6):
     total_listings_count = 0
     total_new_trades_count = 0
     total_skipped_history_items = 0
-    sync_state_updates = []
 
     headers = {"User-Agent": "FF14-Listings-Pipeline/2.0"}
     limits = httpx.Limits(max_keepalive_connections=20, max_connections=concurrency * 4)
     sem = asyncio.Semaphore(concurrency)
     sub_batch_size = 15
 
-    print("\n=== [1/4] Executing Realtime Listings Scan & Incremental History Sync ===")
+    print("\n=== [1/4] Executing Realtime Listings Scan & Incremental History Sync (Japan All 32 Worlds) ===")
+    t_japan_start = time.time()
+
     async with httpx.AsyncClient(headers=headers, limits=limits) as client:
-        for dc_idx, dc_name in enumerate(JAPAN_DCS, 1):
-            dc_start = time.time()
-            dc_worlds = DC_WORLDS[dc_name]
-            print(f"\n--- [{dc_idx}/4] {dc_name} DC ({len(dc_worlds)} worlds) ---")
+        # 自己修復チェック＆隔離リストの更新
+        japan_corrupted = corrupted_by_dc.get("Japan", set())
+        if japan_corrupted:
+            await check_and_self_heal_corrupted_items(client, conn, "Japan", japan_corrupted)
 
-            # 自己修復チェック＆隔離リストの更新
-            dc_corrupted = corrupted_by_dc.get(dc_name, set())
-            if dc_corrupted:
-                await check_and_self_heal_corrupted_items(client, conn, dc_name, dc_corrupted)
+        active_marketable_ids = [iid for iid in marketable_ids if iid not in japan_corrupted]
+        listings_chunks = [active_marketable_ids[i:i + CHUNK_SIZE_LISTINGS] for i in range(0, len(active_marketable_ids), CHUNK_SIZE_LISTINGS)]
+        total_listings_chunks = len(listings_chunks)
 
-            # このDC用に対象アイテムをフィルタ（壊れているアイテムを最初から除外して500エラー＆無駄な分割待機を完全回避）
-            dc_marketable_ids = [iid for iid in marketable_ids if iid not in dc_corrupted]
-            dc_chunks = [dc_marketable_ids[i:i + CHUNK_SIZE_LISTINGS] for i in range(0, len(dc_marketable_ids), CHUNK_SIZE_LISTINGS)]
-            total_chunks = len(dc_chunks)
+        # Step 1: Listings fetch + extract lastUploadTime across all 32 Japan worlds
+        completed_l = 0
+        failed_l = 0
+        japan_upload_times = {}
 
-            # Step 1: Listings fetch + extract lastUploadTime
-            completed = 0
-            failed = 0
-            dc_listings_count = 0
-            dc_upload_times = {}
+        for i in range(0, total_listings_chunks, sub_batch_size):
+            batch = listings_chunks[i:i + sub_batch_size]
+            tasks = [fetch_dc_chunk(client, "Japan", ch, sem, conn=conn) for ch in batch]
+            results = await asyncio.gather(*tasks)
 
-            for i in range(0, total_chunks, sub_batch_size):
-                batch = dc_chunks[i:i + sub_batch_size]
-                tasks = [fetch_dc_chunk(client, dc_name, ch, sem, conn=conn) for ch in batch]
+            for extracted, up_times, success, err in results:
+                if success and extracted:
+                    for w, items in extracted.items():
+                        for iid, l_list in items.items():
+                            all_listings_by_item[iid][w] = l_list
+                            total_listings_count += len(l_list)
+                if up_times:
+                    japan_upload_times.update(up_times)
+                if not success:
+                    failed_l += 1
+
+            completed_l += len(batch)
+            elapsed_l = time.time() - t_japan_start
+            rate_l = completed_l / elapsed_l if elapsed_l > 0 else 0
+            pct_l = (completed_l / total_listings_chunks) * 100
+            print(f"  ⚡ Japan Listings: {completed_l}/{total_listings_chunks} ({pct_l:.0f}%) | {rate_l:.1f} req/s | Listings: {total_listings_count:,} | Elapsed: {elapsed_l:.1f}s")
+
+        # Step 2: Diff Detection for Sale History
+        items_needing_history = []
+        sync_state_updates = []
+        now_ms = int(time.time() * 1000)
+        two_hours_ago_ms = now_ms - (2 * 3600 * 1000)
+
+        for iid, cur_time in japan_upload_times.items():
+            prev_time = known_sync_state.get(iid, 0)
+            if prev_time > 0:
+                if cur_time > prev_time:
+                    items_needing_history.append(iid)
+            else:
+                # 初期シードまたは長期間未更新時: 直近2時間以内にアクティブだったアイテムを優先
+                if cur_time >= two_hours_ago_ms:
+                    items_needing_history.append(iid)
+
+            now_sec = int(time.time())
+            sync_state_updates.append((iid, "Japan", cur_time, now_sec))
+            for dc_n in JAPAN_DCS:
+                sync_state_updates.append((iid, dc_n, cur_time, now_sec))
+
+        pct_diff = (len(items_needing_history) / len(marketable_ids)) * 100.0 if marketable_ids else 0
+        print(f"  🔍 Diff Detected: {len(items_needing_history):,}/{len(marketable_ids):,} items had new uploads ({pct_diff:.1f}%)")
+
+        # 雪だるま防止安全弁: 長期停止からの復旧時など差分が膨大な場合は、直近で動いた2,500件を優先取得してタイムアウトを防止
+        if len(items_needing_history) > 2500:
+            print(f"  ⚠️ Large diff detected ({len(items_needing_history):,} items). Prioritizing top 2,500 most recently updated items for this run.")
+            items_needing_history.sort(key=lambda x: japan_upload_times.get(x, 0), reverse=True)
+            items_needing_history = items_needing_history[:2500]
+
+        # Step 3: Incremental 7-Day History Fetch for diff items
+        if items_needing_history:
+            hist_chunks = [items_needing_history[i:i + CHUNK_SIZE_HISTORY] for i in range(0, len(items_needing_history), CHUNK_SIZE_HISTORY)]
+            total_hist_chunks = len(hist_chunks)
+            t_hist_start = time.time()
+            japan_sales_records = []
+            hist_failed = 0
+            completed_hist = 0
+            sub_hist_batch = 8
+
+            for i in range(0, total_hist_chunks, sub_hist_batch):
+                # タイムバジェット判定 (5分 = 300秒)
+                t_hist_check = time.time() - t_hist_start
+                if t_hist_check > MAX_HISTORY_SECONDS:
+                    rem_chunks = hist_chunks[i:]
+                    rem_items = sum(len(ch) for ch in rem_chunks)
+                    total_skipped_history_items += rem_items
+                    print(f"    ⏱️ [Time Budget Reached] History reached {t_hist_check:.1f}s limit. Deferring remaining {rem_items} items to protect pipeline runtime.")
+                    break
+
+                batch = hist_chunks[i:i + sub_hist_batch]
+                tasks = [fetch_history_chunk(client, "Japan", ch, sem, retry_limit=1) for ch in batch]
                 results = await asyncio.gather(*tasks)
 
-                for extracted, up_times, success, err in results:
-                    if success and extracted:
-                        for w, items in extracted.items():
-                            for iid, l_list in items.items():
-                                all_listings_by_item[iid][w] = l_list
-                                dc_listings_count += len(l_list)
-                    if up_times:
-                        dc_upload_times.update(up_times)
-                    if not success:
-                        failed += 1
+                for recs, success, err, skipped in results:
+                    if success and recs:
+                        japan_sales_records.extend(recs)
+                    elif not success:
+                        hist_failed += 1
+                        total_skipped_history_items += skipped
 
-                completed += len(batch)
-                elapsed = time.time() - dc_start
-                rate = completed / elapsed if elapsed > 0 else 0
-                pct = (completed / total_chunks) * 100
-                print(f"  ⚡ {dc_name} Listings: {completed}/{total_chunks} ({pct:.0f}%) | {rate:.1f} req/s | Listings: {dc_listings_count:,} | Elapsed: {elapsed:.1f}s")
+                completed_hist += len(batch)
+                t_hist_now = time.time() - t_hist_start
+                pct_h = (completed_hist / total_hist_chunks) * 100
+                h_rate = completed_hist / t_hist_now if t_hist_now > 0 else 0
+                print(f"  📥 Japan History: {completed_hist}/{total_hist_chunks} ({pct_h:.0f}%) | {h_rate:.1f} req/s | Trades: {len(japan_sales_records):,} | Skipped: {total_skipped_history_items} items | Elapsed: {t_hist_now:.1f}s")
 
-            total_listings_count += dc_listings_count
+            t_hist_elapsed = time.time() - t_hist_start
+            total_new_trades_count += len(japan_sales_records)
 
-            # Step 2: Diff Detection for Sale History
-            items_needing_history = []
-            now_ms = int(time.time() * 1000)
-            six_hours_ago_ms = now_ms - (6 * 3600 * 1000)
+            if japan_sales_records:
+                cursor.executemany("""
+                INSERT OR IGNORE INTO sales_history (item_id, dc_name, world_name, hq, price_per_unit, quantity, timestamp, buyer_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, japan_sales_records)
+                conn.commit()
 
-            for iid, cur_time in dc_upload_times.items():
-                prev_time = known_sync_state.get((iid, dc_name), 0)
-                if prev_time > 0:
-                    if cur_time > prev_time:
-                        items_needing_history.append(iid)
-                else:
-                    # Initial seed: items active in last 6 hours
-                    if cur_time >= six_hours_ago_ms:
-                        items_needing_history.append(iid)
+            print(f"  ✨ Japan History Merged: {completed_hist}/{total_hist_chunks} chunks in {t_hist_elapsed:.1f}s ({len(japan_sales_records):,} trades, Skipped: {total_skipped_history_items} items, Failures: {hist_failed})")
+        else:
+            print("  ✨ History Sync: No new uploads detected (Skipped).")
 
-                sync_state_updates.append((iid, dc_name, cur_time, int(time.time())))
+        # 同期状態をDBへコミット（雪だるま式ループの恒久防止）
+        if sync_state_updates:
+            cursor.executemany("""
+            INSERT OR REPLACE INTO item_sync_state (item_id, dc_name, last_upload_time, last_history_sync)
+            VALUES (?, ?, ?, ?)
+            """, sync_state_updates)
+            conn.commit()
 
-            pct_diff = (len(items_needing_history) / len(marketable_ids)) * 100.0 if marketable_ids else 0
-            print(f"  🔍 Diff Detected: {len(items_needing_history):,}/{len(marketable_ids):,} items had new uploads ({pct_diff:.1f}%)")
+        print(f"✨ Japan Scan & Sync finished in {time.time() - t_japan_start:.1f}s")
 
-            # Step 3: Incremental 7-Day History Fetch for diff items
-            if items_needing_history:
-                hist_chunks = [items_needing_history[i:i + CHUNK_SIZE_HISTORY] for i in range(0, len(items_needing_history), CHUNK_SIZE_HISTORY)]
-                total_hist_chunks = len(hist_chunks)
-                t_hist_start = time.time()
-                dc_sales_records = []
-                hist_failed = 0
-                completed_hist = 0
-                dc_skipped_items = 0
-                sub_hist_batch = 12
-                consecutive_failed_batches = 0
-
-                for i in range(0, total_hist_chunks, sub_hist_batch):
-                    batch = hist_chunks[i:i + sub_hist_batch]
-                    tasks = [fetch_history_chunk(client, dc_name, ch, sem, retry_limit=3) for ch in batch]
-                    results = await asyncio.gather(*tasks)
-
-                    batch_has_success = False
-                    for recs, success, err, skipped in results:
-                        if success and recs:
-                            dc_sales_records.extend(recs)
-                            batch_has_success = True
-                        elif not success:
-                            hist_failed += 1
-                            dc_skipped_items += skipped
-
-                    completed_hist += len(batch)
-                    t_hist_now = time.time() - t_hist_start
-                    pct_h = (completed_hist / total_hist_chunks) * 100
-                    h_rate = completed_hist / t_hist_now if t_hist_now > 0 else 0
-                    print(f"  📥 {dc_name} History: {completed_hist}/{total_hist_chunks} ({pct_h:.0f}%) | {h_rate:.1f} req/s | Trades: {len(dc_sales_records):,} | Skipped: {dc_skipped_items} items | Elapsed: {t_hist_now:.1f}s")
-
-                    # サーキットブレーカー: 3連続バッチで全て失敗した場合はサーバー障害とみなし残りを安全にスキップ
-                    if not batch_has_success:
-                        consecutive_failed_batches += 1
-                        if consecutive_failed_batches >= 3:
-                            remaining_chunks = hist_chunks[i + sub_hist_batch:]
-                            remaining_items = sum(len(ch) for ch in remaining_chunks)
-                            dc_skipped_items += remaining_items
-                            print(f"    🚨 [Circuit Breaker] 3 consecutive history batches failed on {dc_name}. Skipping remaining {remaining_items} items to protect pipeline runtime.")
-                            break
-                    else:
-                        consecutive_failed_batches = 0
-
-                total_skipped_history_items += dc_skipped_items
-                t_hist_elapsed = time.time() - t_hist_start
-                total_new_trades_count += len(dc_sales_records)
-
-                if dc_sales_records:
-                    cursor.executemany("""
-                    INSERT OR IGNORE INTO sales_history (item_id, dc_name, world_name, hq, price_per_unit, quantity, timestamp, buyer_name)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """, dc_sales_records)
-                    conn.commit()
-
-                print(f"  ✨ {dc_name} History Merged: {completed_hist}/{total_hist_chunks} chunks in {t_hist_elapsed:.1f}s ({len(dc_sales_records):,} trades, Skipped: {dc_skipped_items} items, Failures: {hist_failed})")
-            else:
-                print("  ✨ History Sync: No new uploads detected (Skipped).")
-
-            print(f"✨ {dc_name} finished in {time.time() - dc_start:.1f}s")
-
-    # Step 4: Save sync state to DB
-    if sync_state_updates:
-        cursor.executemany("""
-        INSERT OR REPLACE INTO item_sync_state (item_id, dc_name, last_upload_time, last_history_sync)
-        VALUES (?, ?, ?, ?)
-        """, sync_state_updates)
-        conn.commit()
-
-    # Step 5: Update current_listings in DB
+    # Step 4: Update current_listings in DB
     print("\n=== [2/4] Merging Listings into SQLite DB ===")
     cursor.execute("CREATE TEMP TABLE temp_listings AS SELECT * FROM current_listings WHERE 0;")
     def iter_db_rows():

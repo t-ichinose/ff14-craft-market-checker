@@ -30,7 +30,7 @@ OUTPUT_DATA_DIR_GZ = "data/data.json.gz"
 
 async def fetch_chunk(client: httpx.AsyncClient, dc_name: str, chunk: list, sem: asyncio.Semaphore, retry_limit: int = 3):
     chunk_str = ",".join(str(x) for x in chunk)
-    url = f"https://universalis.app/api/v2/history/{dc_name}/{chunk_str}?entriesWithin=604800&entriesToReturn=500"
+    url = f"https://universalis.app/api/v2/history/{dc_name}/{chunk_str}?entriesWithin=604800&entriesToReturn=100"
     last_err = None
     
     async with sem:
